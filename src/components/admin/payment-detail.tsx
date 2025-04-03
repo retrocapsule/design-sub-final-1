@@ -233,14 +233,14 @@ export function PaymentDetail({ paymentId }: PaymentDetailProps) {
               <div className="space-y-4 py-4">
                 <RadioGroup
                   value={refundType}
-                  onValueChange={setRefundType}
+                  onValueChange={(value) => setRefundType(value)}
                   className="space-y-2"
                 >
-                  <div className="flex items-center space-x-2">
+                  <div>
                     <RadioGroupItem value="full" id="full" />
                     <Label htmlFor="full">Full Refund ({formatCurrency(getRemainingRefundableAmount())})</Label>
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div>
                     <RadioGroupItem value="partial" id="partial" />
                     <Label htmlFor="partial">Partial Refund</Label>
                   </div>
@@ -248,25 +248,13 @@ export function PaymentDetail({ paymentId }: PaymentDetailProps) {
 
                 {refundType === "partial" && (
                   <div className="space-y-2">
-                    <Label htmlFor="refundAmount">Refund Amount</Label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                        $
-                      </span>
-                      <Input
-                        id="refundAmount"
-                        type="number"
-                        min="0.01"
-                        max={(getRemainingRefundableAmount() / 100).toFixed(2)}
-                        step="0.01"
-                        value={refundAmount}
-                        onChange={(e) => setRefundAmount(e.target.value)}
-                        className="pl-8"
-                      />
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Maximum: {formatCurrency(getRemainingRefundableAmount())}
-                    </p>
+                    <Label htmlFor="refund-amount">Refund Amount</Label>
+                    <Input
+                      id="refund-amount"
+                      placeholder="0.00"
+                      value={refundAmount}
+                      onChange={(e) => setRefundAmount(e.target.value)}
+                    />
                   </div>
                 )}
               </div>

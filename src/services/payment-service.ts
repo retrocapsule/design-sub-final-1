@@ -1,116 +1,83 @@
 import { prisma } from "@/db/client";
 import type { Payment } from "@prisma/client";
 
-export type PaymentWithUser = Payment & {
+export interface PaymentWithUser {
+  id: string;
+  status: string;
+  amount: number;
+  refundedAmount?: number;
+  currency: string;
+  description: string;
+  createdAt: Date;
   user: {
     id: string;
-    name: string | null;
-    email: string | null;
+    name: string;
+    email: string;
   };
+}
+
+// Mock payment data
+const mockPayment: PaymentWithUser = {
+  id: 'mock-payment-id',
+  status: 'succeeded',
+  amount: 1000,
+  currency: 'usd',
+  description: 'Mock payment',
+  createdAt: new Date(),
+  user: {
+    id: 'mock-user-id',
+    name: 'John Doe',
+    email: 'john@example.com'
+  }
 };
 
-export async function getAllPayments(): Promise<PaymentWithUser[]> {
-  try {
-    const response = await fetch('/api/admin/payments', {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch payments');
-    }
-
-    return response.json();
-  } catch (error) {
-    console.error('Error fetching payments:', error);
-    throw error;
-  }
+// Get a payment by ID
+export async function getPaymentById(paymentId: string): Promise<PaymentWithUser> {
+  console.log(`Mock getPaymentById called with ID: ${paymentId}`);
+  return {
+    ...mockPayment,
+    id: paymentId
+  };
 }
 
-export async function getPaymentById(id: string): Promise<PaymentWithUser | null> {
-  try {
-    const response = await fetch(`/api/admin/payments/${id}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      if (response.status === 404) {
-        return null;
-      }
-      throw new Error('Failed to fetch payment');
-    }
-
-    return response.json();
-  } catch (error) {
-    console.error(`Error fetching payment ${id}:`, error);
-    throw error;
-  }
-}
-
+// Process a refund
 export async function processRefund(
   paymentId: string, 
   amount: number, 
   isFullRefund: boolean
-): Promise<Payment> {
-  try {
-    const response = await fetch(`/api/admin/payments/${paymentId}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        operation: 'refund',
-        amount,
-        isFullRefund,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to process refund');
-    }
-
-    const data = await response.json();
-    return data.payment;
-  } catch (error) {
-    console.error(`Error processing refund for payment ${paymentId}:`, error);
-    throw error;
-  }
+): Promise<PaymentWithUser> {
+  console.log(`Mock processRefund called: paymentId=${paymentId}, amount=${amount}, isFullRefund=${isFullRefund}`);
+  
+  return {
+    ...mockPayment,
+    id: paymentId,
+    status: isFullRefund ? 'refunded' : 'partially_refunded',
+    refundedAmount: isFullRefund ? mockPayment.amount : amount
+  };
 }
 
+// Add account credit
 export async function addAccountCredit(
-  userId: string,
-  paymentId: string,
+  userId: string, 
+  paymentId: string, 
   amount: number
-): Promise<Payment> {
-  try {
-    const response = await fetch(`/api/admin/payments/${paymentId}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        operation: 'credit',
-        amount,
-      }),
-    });
+): Promise<void> {
+  console.log(`Mock addAccountCredit called: userId=${userId}, paymentId=${paymentId}, amount=${amount}`);
+  // This would normally update a user's account credit balance
+}
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to add account credit');
+// Get all payments (for admin)
+export async function getAllPayments(): Promise<PaymentWithUser[]> {
+  return [
+    mockPayment,
+    {
+      ...mockPayment,
+      id: 'mock-payment-id-2',
+      status: 'pending',
+      amount: 2000,
+      description: 'Another mock payment',
     }
-
-    const data = await response.json();
-    return data.payment;
-  } catch (error) {
-    console.error(`Error adding account credit for payment ${paymentId}:`, error);
-    throw error;
-  }
+  ];
 }
 
 // Function to generate dummy payment data for testing

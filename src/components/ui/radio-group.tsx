@@ -1,44 +1,67 @@
 "use client"
 
 import * as React from "react"
-import * as RadioGroupPrimitive from "@radix-ui/react-radio-group"
-import { Circle } from "lucide-react"
-
 import { cn } from "@/lib/utils"
 
+// Simple radio group implementation without Radix UI
 const RadioGroup = React.forwardRef<
-  React.ElementRef<typeof RadioGroupPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof RadioGroupPrimitive.Root>
->(({ className, ...props }, ref) => {
-  return (
-    <RadioGroupPrimitive.Root
-      className={cn("grid gap-2", className)}
-      {...props}
-      ref={ref}
-    />
-  )
-})
-RadioGroup.displayName = RadioGroupPrimitive.Root.displayName
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement> & { value?: string; onValueChange?: (value: string) => void }
+>(({ className, children, ...props }, ref) => {
+  // Extract these props to prevent passing them to the div
+  const { value, onValueChange, ...otherProps } = props;
 
-const RadioGroupItem = React.forwardRef<
-  React.ElementRef<typeof RadioGroupPrimitive.Item>,
-  React.ComponentPropsWithoutRef<typeof RadioGroupPrimitive.Item>
->(({ className, ...props }, ref) => {
+  // Inject value and onChange to children
+  const childrenWithProps = React.Children.map(children, child => {
+    if (React.isValidElement(child)) {
+      return React.cloneElement(child, { 
+        groupValue: value,
+        onGroupValueChange: onValueChange
+      });
+    }
+    return child;
+  });
+
   return (
-    <RadioGroupPrimitive.Item
+    <div
+      className={cn("grid gap-2", className)}
       ref={ref}
-      className={cn(
-        "aspect-square h-4 w-4 rounded-full border border-primary text-primary ring-offset-background focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
-        className
-      )}
-      {...props}
+      {...otherProps}
     >
-      <RadioGroupPrimitive.Indicator className="flex items-center justify-center">
-        <Circle className="h-2.5 w-2.5 fill-current text-current" />
-      </RadioGroupPrimitive.Indicator>
-    </RadioGroupPrimitive.Item>
-  )
-})
-RadioGroupItem.displayName = RadioGroupPrimitive.Item.displayName
+      {childrenWithProps}
+    </div>
+  );
+});
+RadioGroup.displayName = "RadioGroup";
+
+// Simple radio group item implementation without Radix UI
+const RadioGroupItem = React.forwardRef<
+  HTMLInputElement,
+  Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange"> & { 
+    value: string; 
+    groupValue?: string; 
+    onGroupValueChange?: (value: string) => void;
+  }
+>(({ className, children, id, value, groupValue, onGroupValueChange, ...props }, ref) => {
+  return (
+    <div className="flex items-center space-x-2">
+      <input
+        ref={ref}
+        type="radio"
+        id={id}
+        className={cn(
+          "aspect-square h-4 w-4 rounded-full border border-primary text-primary ring-offset-background focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+          className
+        )}
+        checked={value === groupValue}
+        onChange={() => onGroupValueChange?.(value)}
+        value={value}
+        {...props}
+      />
+      {children}
+    </div>
+  );
+});
+RadioGroupItem.displayName = "RadioGroupItem";
 
 export { RadioGroup, RadioGroupItem } 
