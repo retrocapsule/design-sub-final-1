@@ -1,10 +1,27 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { stripe } from '@/lib/stripe';
+import Stripe from 'stripe';
+
+// Initialize Stripe with proper error handling
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+if (!stripeSecretKey && process.env.NODE_ENV === 'production') {
+  console.error('STRIPE_SECRET_KEY is missing in production environment');
+}
+
+const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, {
+  apiVersion: '2023-10-16',
+}) : null;
 
 export async function GET() {
   try {
+    if (!stripe) {
+      return NextResponse.json(
+        { error: 'Payment processing is not configured' },
+        { status: 500 }
+      );
+    }
+
     const session = await getServerSession(authOptions);
     
     if (!session?.user) {
@@ -29,7 +46,7 @@ export async function GET() {
   } catch (error) {
     console.error('Error fetching invoices:', error);
     return NextResponse.json(
-      { message: 'Error fetching invoices' },
+      { error: 'An error occurred while fetching invoices' },
       { status: 500 }
     );
   }
