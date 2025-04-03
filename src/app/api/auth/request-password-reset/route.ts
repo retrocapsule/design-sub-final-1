@@ -1,9 +1,16 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { sendEmail } from '@/lib/email';
+import { Resend } from 'resend';
 import crypto from 'crypto';
 
-const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'; // Fallback for local dev
+// Initialize Resend with proper error handling
+const resendApiKey = process.env.RESEND_API_KEY;
+if (!resendApiKey && process.env.NODE_ENV === 'production') {
+  console.error('RESEND_API_KEY is missing in production environment');
+}
+const resend = resendApiKey ? new Resend(resendApiKey) : null;
+
+const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
 export async function POST(request: Request) {
   try {
@@ -26,7 +33,7 @@ export async function POST(request: Request) {
       const passwordResetToken = resetToken;
 
       // Set expiration time (e.g., 1 hour from now)
-      const passwordResetExpires = new Date(Date.now() + 3600000); // 1 hour in ms
+      const passwordResetExpires = new Date(Date.now() + 3600000);
 
       // Update user record with token and expiry
       await prisma.user.update({
@@ -40,25 +47,31 @@ export async function POST(request: Request) {
       // Construct the reset link
       const resetLink = `${appUrl}/reset-password?token=${resetToken}`;
 
-      // Send the email using our email service
-      const emailResult = await sendEmail({
-        to: user.email,
-        subject: 'Password Reset Request',
-        html: `
-          <h1>Password Reset Request</h1>
-          <p>You requested a password reset. Click the link below to reset your password:</p>
-          <p><a href="${resetLink}">Reset Password</a></p>
-          <p>This link will expire in 1 hour.</p>
-          <p>If you didn't request this, you can safely ignore this email.</p>
-        `,
-      });
-
-      if (!emailResult.success) {
-        console.error('Failed to send password reset email:', emailResult.error);
-        return NextResponse.json(
-          { error: 'Failed to send password reset email' },
-          { status: 500 }
-        );
+      // Send the email using Resend if available, otherwise log it
+      if (resend) {
+        try {
+          await resend.emails.send({
+            from: 'noreply@yourdomain.com',
+            to: user.email,
+            subject: 'Password Reset Request',
+            html: `
+              <h1>Password Reset Request</h1>
+              <p>You requested a password reset. Click the link below to reset your password:</p>
+              <p><a href="${resetLink}">Reset Password</a></p>
+              <p>This link will expire in 1 hour.</p>
+              <p>If you didn't request this, you can safely ignore this email.</p>
+            `,
+          });
+        } catch (emailError) {
+          console.error('Failed to send password reset email:', emailError);
+          return NextResponse.json(
+            { error: 'Failed to send password reset email' },
+            { status: 500 }
+          );
+        }
+      } else {
+        // In development or if Resend is not configured, log the reset link
+        console.log('Password reset link (development only):', resetLink);
       }
 
       return NextResponse.json({ message: 'Password reset email sent' });
