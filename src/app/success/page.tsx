@@ -4,7 +4,7 @@ import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import Navigation from '@/components/Navigation'; // Assuming you have a Navigation component
+import { Navigation } from '@/components/layout/navigation'; // Corrected import path
 import { toast } from 'sonner';
 
 function SuccessContent() {

@@ -8,46 +8,13 @@ export async function GET(
   req: NextRequest,
   { params }: { params: { paymentId: string } }
 ) {
-  try {
-    // Check admin authorization
-    const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== "ADMIN") {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
-    const { paymentId } = params;
-
-    const payment = await prisma.payment.findUnique({
-      where: { id: paymentId },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        }
-      }
-    });
-
-    if (!payment) {
-      return NextResponse.json(
-        { error: "Payment not found" },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json(payment);
-  } catch (error) {
-    console.error("Error fetching payment:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch payment" },
-      { status: 500 }
-    );
-  }
+  const paymentId = params.paymentId;
+  
+  return NextResponse.json({
+    message: 'This API route is under development',
+    paymentId,
+    details: { status: 'pending' }
+  });
 }
 
 // PATCH handler to update payment (for refunds or credits)
@@ -142,4 +109,17 @@ export async function PATCH(
       { status: 500 }
     );
   }
+}
+
+export async function PUT(
+  request: Request,
+  { params }: { params: { paymentId: string } }
+) {
+  const paymentId = params.paymentId;
+  
+  return NextResponse.json({
+    message: 'This API route is under development',
+    paymentId,
+    updated: false
+  }, { status: 503 });
 } 
