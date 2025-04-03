@@ -10,9 +10,6 @@ const nextConfig = {
     // your project has TypeScript errors.
     ignoreBuildErrors: true,
   },
-  experimental: {
-    nodeMiddleware: true,
-  },
   webpack: (config, { isServer }) => {
     if (isServer) {
       config.externals.push('@prisma/client');
