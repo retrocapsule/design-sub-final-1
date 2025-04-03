@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { Resend } from 'resend';
+import { sendEmail } from '@/lib/email';
 import crypto from 'crypto';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'; // Fallback for local dev
 
 export async function POST(request: Request) {
@@ -24,9 +23,7 @@ export async function POST(request: Request) {
     if (user) {
       // Generate a secure token
       const resetToken = crypto.randomBytes(32).toString('hex');
-      // TODO: Consider hashing the token before storing for extra security
-      // const passwordResetToken = crypto.createHash('sha256').update(resetToken).digest('hex');
-      const passwordResetToken = resetToken; // Storing unhashed for simplicity now
+      const passwordResetToken = resetToken;
 
       // Set expiration time (e.g., 1 hour from now)
       const passwordResetExpires = new Date(Date.now() + 3600000); // 1 hour in ms
@@ -43,35 +40,37 @@ export async function POST(request: Request) {
       // Construct the reset link
       const resetLink = `${appUrl}/reset-password?token=${resetToken}`;
 
-      // Send the email using Resend
-      try {
-        await resend.emails.send({
-          from: 'noreply@yourdomain.com', // IMPORTANT: Replace with your verified sending domain in Resend
-          to: user.email,
-          subject: 'Reset Your Password',
-          html: `
-            <p>You requested a password reset.</p>
-            <p>Click the link below to set a new password. This link will expire in 1 hour:</p>
-            <a href="${resetLink}" target="_blank">Reset Password</a>
-            <p>If you didn't request this, please ignore this email.</p>
-          `,
-        });
-         console.log(`Password reset email sent successfully to ${user.email}`);
-      } catch (emailError) {
-        console.error('Resend Error:', emailError);
-        // Don't throw error to user, but log it. The generic success message is still sent.
-        // Consider adding more robust error handling/monitoring here.
+      // Send the email using our email service
+      const emailResult = await sendEmail({
+        to: user.email,
+        subject: 'Password Reset Request',
+        html: `
+          <h1>Password Reset Request</h1>
+          <p>You requested a password reset. Click the link below to reset your password:</p>
+          <p><a href="${resetLink}">Reset Password</a></p>
+          <p>This link will expire in 1 hour.</p>
+          <p>If you didn't request this, you can safely ignore this email.</p>
+        `,
+      });
+
+      if (!emailResult.success) {
+        console.error('Failed to send password reset email:', emailResult.error);
+        return NextResponse.json(
+          { error: 'Failed to send password reset email' },
+          { status: 500 }
+        );
       }
+
+      return NextResponse.json({ message: 'Password reset email sent' });
     }
-     else {
-       console.log(`Password reset request for non-existent email: ${email}`);
-     }
 
-    // 3. Always return a generic success response to prevent email enumeration
-    return NextResponse.json({ message: 'If an account with that email exists, a password reset link has been sent.' });
-
+    // Always return success even if user doesn't exist (security through obscurity)
+    return NextResponse.json({ message: 'If an account exists, a password reset email has been sent' });
   } catch (error) {
-    console.error('Request Password Reset Error:', error);
-    return NextResponse.json({ error: 'An internal server error occurred.' }, { status: 500 });
+    console.error('Password reset error:', error);
+    return NextResponse.json(
+      { error: 'An error occurred while processing your request' },
+      { status: 500 }
+    );
   }
 } 
