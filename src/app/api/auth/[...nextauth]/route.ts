@@ -1,0 +1,105 @@
+import NextAuth, { NextAuthOptions } from "next-auth";
+import { Adapter } from "next-auth/adapters";
+import CredentialsProvider from "next-auth/providers/credentials";
+import { PrismaAdapter } from "@auth/prisma-adapter";
+import { db } from "@/lib/db";
+import { compare } from "bcrypt";
+import type { User as NextAuthUser } from "next-auth";
+
+// Define AuthOptions for v4
+export const authOptions: NextAuthOptions = {
+  adapter: PrismaAdapter(db) as Adapter,
+  secret: process.env.NEXTAUTH_SECRET,
+  session: {
+    strategy: "jwt",
+  },
+  pages: {
+    signIn: "/signin",
+    signOut: "/signout",
+    error: "/error",
+  },
+  providers: [
+    CredentialsProvider({
+      name: "Credentials",
+      credentials: {
+        email: { label: "Email", type: "email", placeholder: "jsmith@example.com" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials, req): Promise<NextAuthUser | null> {
+        if (!credentials?.email || !credentials?.password) {
+          console.error("Authorize: Missing credentials");
+          return null;
+        }
+
+        const user = await db.user.findUnique({
+          where: {
+            email: credentials.email,
+          },
+        });
+
+        if (!user || !user.password) {
+          console.error(`Authorize: User not found or no password for ${credentials.email}`);
+          return null;
+        }
+
+        const isPasswordValid = await compare(
+          credentials.password,
+          user.password
+        );
+
+        if (!isPasswordValid) {
+          console.error(`Authorize: Invalid password for ${credentials.email}`);
+          return null;
+        }
+
+        console.log(`Authorize: Success for ${credentials.email}`);
+        // Return the user object matching NextAuthUser structure, including role
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          image: user.image,
+          role: user.role, // Include role to satisfy type checker
+        };
+      },
+    }),
+  ],
+  callbacks: {
+    async session({ session, token }) {
+      if (token && session.user) {
+        // Add properties from token to session user
+        (session.user as any).id = token.sub; // Standard way to pass id
+        (session.user as any).role = token.role; // Pass custom role
+      }
+      return session;
+    },
+    async jwt({ token, user, account }) {
+      // Initial sign in
+      if (account && user) {
+        // Persist standard OAuth profile properties to token
+        token.accessToken = account.access_token;
+        token.id = user.id; // user.id is available on initial sign in
+        
+        // Fetch role from DB and add to token
+        // We use the user object passed on sign-in which includes the role from authorize
+        if ((user as any).role) {
+             token.role = (user as any).role;
+        }
+      }
+      // Subsequent requests, token exists
+      return token;
+    },
+    async redirect({ url, baseUrl }) {
+      // Allows relative callback URLs
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      // Allows callback URLs on the same origin
+      else if (new URL(url).origin === baseUrl) return url;
+      return baseUrl;
+    },
+  },
+  debug: process.env.NODE_ENV === 'development',
+};
+
+// Export named handlers for GET and POST for App Router
+const handler = NextAuth(authOptions);
+export { handler as GET, handler as POST }; 

@@ -1,0 +1,134 @@
+Based on your Prisma Studio at http://localhost:5555, here's a simple explanation of your database models and how they're used in your app:
+
+## User
+**What it is:** People who use your app - both regular users and admins
+**Where it's used:** Account management, login/signup, user profiles
+**CRUD operations:**
+- **Create:** When someone signs up
+- **Read:** When displaying user profiles or checking login status
+- **Update:** When users edit their profile or subscription status
+- **Delete:** When accounts are removed (less common)
+
+## Account
+**What it is:** External accounts (like Google, GitHub) that users can log in with
+**Where it's used:** Alternative login methods
+**CRUD operations:**
+- **Create:** When a user connects a social account
+- **Read:** During login with external providers
+- **Delete:** When disconnecting external accounts
+
+## Session
+**What it is:** Keeps track of who's logged in and for how long
+**Where it's used:** Behind the scenes for authentication
+**CRUD operations:**
+- **Create:** When someone logs in
+- **Read:** To verify user is logged in
+- **Delete:** When logging out or session expires
+
+## VerificationToken
+**What it is:** Temporary codes for email verification
+**Where it's used:** Email verification process
+**CRUD operations:**
+- **Create:** When sending verification emails
+- **Read:** When verifying the token is valid
+- **Delete:** After verification or expiration
+
+## DesignRequest
+**What it is:** Design projects that users submit
+**Where it's used:** Main service request system
+**CRUD operations:**
+- **Create:** When users submit new design requests
+- **Read:** In dashboards showing design requests
+- **Update:** When changing status or details
+- **Delete:** If requests are canceled
+
+## Comment
+**What it is:** Feedback or notes on design requests
+**Where it's used:** Communication on design projects
+**CRUD operations:**
+- **Create:** When adding feedback
+- **Read:** When viewing conversations
+- **Update:** When editing comments
+- **Delete:** When removing comments
+
+## File
+**What it is:** Design files uploaded to the system
+**Where it's used:** Sharing designs and assets
+**CRUD operations:**
+- **Create:** When uploading files
+- **Read:** When viewing or downloading files
+- **Delete:** When removing old files
+
+## CaseStudy
+**What it is:** Success stories showcasing your work
+**Where it's used:** Marketing/portfolio section of website
+**CRUD operations:**
+- **Create:** When adding new case studies in admin panel
+- **Read:** When visitors view case studies
+- **Update:** When editing case study details
+- **Delete:** When removing outdated case studies
+
+## Service
+**What it is:** Different design services you offer
+**Where it's used:** Service catalog/listing
+**CRUD operations:**
+- **Create:** When adding new services in admin panel
+- **Read:** When displaying service options
+- **Update:** When editing service details
+- **Delete:** When discontinuing services
+
+## Package
+**What it is:** Subscription plans or service bundles
+**Where it's used:** Pricing page
+**CRUD operations:**
+- **Create:** When creating new subscription tiers
+- **Read:** When displaying pricing options
+- **Update:** When changing prices or features
+- **Delete:** When discontinuing packages
+
+## Subscription
+**What it is:** User's active subscription plan
+**Where it's used:** Billing/membership system
+**CRUD operations:**
+- **Create:** When users subscribe
+- **Read:** When checking subscription status
+- **Update:** When changing plans or renewal
+- **Delete:** When canceling subscriptions
+
+## Message
+**What it is:** Communication between users and admin
+**Where it's used:** Internal messaging system
+**CRUD operations:**
+- **Create:** When sending messages
+- **Read:** When viewing conversations
+- **Update:** When marking as read
+- **Delete:** When deleting messages
+
+## Deliverable
+**What it is:** Final design outputs for projects
+**Where it's used:** Project delivery system
+**CRUD operations:**
+- **Create:** When adding completed designs
+- **Read:** When viewing deliverables
+- **Update:** When revising deliverables
+- **Delete:** When removing deliverables
+
+## DesignTemplate
+**What it is:** Pre-made design templates
+**Where it's used:** Starting points for new designs
+**CRUD operations:**
+- **Create:** When adding new templates
+- **Read:** When browsing available templates
+- **Update:** When improving templates
+- **Delete:** When removing outdated templates
+
+## Payment
+**What it is:** Records of financial transactions
+**Where it's used:** Billing history, financial reporting
+**CRUD operations:**
+- **Create:** When payments are processed
+- **Read:** When viewing payment history
+- **Update:** When processing refunds
+- **Delete:** Rarely (payments usually archived, not deleted)
+
+The database forms the foundation of your design subscription service, storing everything from user accounts and design requests to payments and deliverables.
