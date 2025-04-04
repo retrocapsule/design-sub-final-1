@@ -18,7 +18,7 @@ export const examples: Example[] = [
     id: "social-1",
     title: "Instagram Posts",
     description: "Engaging social media content that drives engagement and grows your following.",
-    image: "/images/examples/instagram_post_example.png",
+    image: "/Images/examples/instagram_post_example.png",
     category: "social",
     details: {
       process: [
@@ -41,7 +41,7 @@ export const examples: Example[] = [
     id: "social-2",
     title: "Story Highlights",
     description: "Custom story templates that maintain brand consistency across Instagram stories.",
-    image: "/images/examples/story_highlight_example.png",
+    image: "/Images/examples/story_highlight_example.png",
     category: "social",
     details: {
       process: [
@@ -64,7 +64,7 @@ export const examples: Example[] = [
     id: "social-3",
     title: "Carousel Posts",
     description: "Multi-slide content that tells your story and drives engagement.",
-    image: "/images/examples/carousel_post_example.png",
+    image: "/Images/examples/carousel_post_example.png",
     category: "social",
     details: {
       process: [
@@ -89,7 +89,7 @@ export const examples: Example[] = [
     id: "merch-1",
     title: "T-Shirt Design",
     description: "Premium streetwear designs that stand out and sell.",
-    image: "/images/examples/tshirt_design_example.png",
+    image: "/Images/examples/tshirt_design_example.png",
     category: "merch",
     details: {
       process: [
@@ -112,7 +112,7 @@ export const examples: Example[] = [
     id: "merch-2",
     title: "Hoodie Design",
     description: "Premium streetwear hoodie designs with unique artwork.",
-    image: "/images/examples/hoodie_design_example.png",
+    image: "/Images/examples/hoodie_design_example.png",
     category: "merch",
     details: {
       process: [
@@ -135,7 +135,7 @@ export const examples: Example[] = [
     id: "merch-3",
     title: "Accessories",
     description: "Matching accessories that complete your merch collection.",
-    image: "/images/examples/accessories_example.png",
+    image: "/Images/examples/accessories_example.png",
     category: "merch",
     details: {
       process: [
@@ -160,7 +160,7 @@ export const examples: Example[] = [
     id: "branding-1",
     title: "Logo Design",
     description: "Professional logo designs that capture your brand essence.",
-    image: "/images/examples/logo_design_example.png",
+    image: "/Images/examples/logo_design_example.png",
     category: "branding",
     details: {
       process: [
@@ -183,7 +183,7 @@ export const examples: Example[] = [
     id: "branding-2",
     title: "Brand Guidelines",
     description: "Comprehensive brand guidelines that ensure consistency.",
-    image: "/images/examples/brand_guidelines_example.png",
+    image: "/Images/examples/brand_guidelines_example.png",
     category: "branding",
     details: {
       process: [
@@ -206,7 +206,7 @@ export const examples: Example[] = [
     id: "branding-3",
     title: "Brand Assets",
     description: "Complete brand asset package for all your needs.",
-    image: "/images/examples/brand_assets_example.png",
+    image: "/Images/examples/brand_assets_example.png",
     category: "branding",
     details: {
       process: [
@@ -231,7 +231,7 @@ export const examples: Example[] = [
     id: "marketing-1",
     title: "Email Campaigns",
     description: "Engaging email designs that drive conversions.",
-    image: "/images/examples/email_campaign_example.png",
+    image: "/Images/examples/email_campaign_example.png",
     category: "marketing",
     details: {
       process: [
@@ -254,7 +254,7 @@ export const examples: Example[] = [
     id: "marketing-2",
     title: "Advertising Creatives",
     description: "Eye-catching ads optimized for performance.",
-    image: "/images/examples/ad_banner_example.png",
+    image: "/Images/examples/ad_banner_example.png",
     category: "marketing",
     details: {
       process: [
@@ -277,7 +277,7 @@ export const examples: Example[] = [
     id: "marketing-3",
     title: "Landing Page Design",
     description: "High-converting landing pages designed for results.",
-    image: "/images/examples/landing_page_example.png",
+    image: "/Images/examples/landing_page_example.png",
     category: "marketing",
     details: {
       process: [
@@ -302,7 +302,7 @@ export const examples: Example[] = [
     id: "print-1",
     title: "Business Cards",
     description: "Professional business cards that make an impression.",
-    image: "/images/examples/business_card_example.png",
+    image: "/Images/examples/business_card_example.png",
     category: "print",
     details: {
       process: [
@@ -325,7 +325,7 @@ export const examples: Example[] = [
     id: "print-2",
     title: "Brochure Design",
     description: "Informative and visually appealing brochures.",
-    image: "/images/examples/brochure_design_example.png",
+    image: "/Images/examples/brochure_design_example.png",
     category: "print",
     details: {
       process: [
@@ -348,7 +348,7 @@ export const examples: Example[] = [
     id: "print-3",
     title: "Posters",
     description: "Eye-catching posters for events or promotions.",
-    image: "/images/examples/poster_example.png",
+    image: "/Images/examples/poster_example.png",
     category: "print",
     details: {
       process: [
@@ -373,7 +373,7 @@ export const examples: Example[] = [
     id: "web-1",
     title: "Website design",
     description: "Engaging web design that drives clicks.",
-    image: "/images/examples/website_design_example.png",
+    image: "/Images/examples/website_design_example.png",
     category: "web",
     details: {
       process: [
@@ -396,7 +396,7 @@ export const examples: Example[] = [
     id: "web-2",
     title: "Landing Page Design",
     description: "Professional landing page design that drives clicks.",
-    image: "/images/examples/landing_page_example.png",
+    image: "/Images/examples/landing_page_example.png",
     category: "web",
     details: {
       process: [
@@ -419,7 +419,7 @@ export const examples: Example[] = [
     id: "web-3",
     title: "UI components",
     description: "Visually stunning UI components that captivate.",
-    image: "/images/examples/ui_components_example.png",
+    image: "/Images/examples/ui_components_example.png",
     category: "web",
     details: {
       process: [

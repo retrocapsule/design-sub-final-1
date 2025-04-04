@@ -34,7 +34,7 @@ export const caseStudies: CaseStudy[] = [
     id: '1',
     title: 'E-commerce Redesign Success',
     description: 'Complete overhaul of an e-commerce platform resulting in improved user experience and increased sales.',
-    image: '/images/examples/website_design_example.png',
+    image: '/Images/examples/website_design_example.png',
     category: 'E-commerce',
     results: {
       title: 'Revenue Growth',
@@ -83,15 +83,15 @@ export const caseStudies: CaseStudy[] = [
     ],
     gallery: [
       {
-        image: "/images/examples/landing_page_example.png",
+        image: "/Images/examples/landing_page_example.png",
         caption: "Homepage redesign with improved navigation"
       },
       {
-        image: "/images/examples/ui_components_example.png",
+        image: "/Images/examples/ui_components_example.png",
         caption: "Mobile-optimized product pages"
       },
       {
-        image: "/images/examples/app_interface_example.png",
+        image: "/Images/examples/app_interface_example.png",
         caption: "Streamlined checkout process"
       }
     ]
@@ -100,7 +100,7 @@ export const caseStudies: CaseStudy[] = [
     id: '2',
     title: 'Brand Identity Transformation',
     description: 'Complete brand identity redesign for a tech startup, including logo, color scheme, and marketing materials.',
-    image: '/images/examples/logo_design_example.png',
+    image: '/Images/examples/logo_design_example.png',
     category: 'Branding',
     results: {
       title: 'Brand Recognition',
@@ -149,15 +149,15 @@ export const caseStudies: CaseStudy[] = [
     ],
     gallery: [
       {
-        image: "/images/examples/logo_design_example.png",
+        image: "/Images/examples/logo_design_example.png",
         caption: "Logo evolution and variations"
       },
       {
-        image: "/images/examples/brand_guidelines_example.png",
+        image: "/Images/examples/brand_guidelines_example.png",
         caption: "Brand color palette and typography"
       },
       {
-        image: "/images/examples/brand_assets_example.png",
+        image: "/Images/examples/brand_assets_example.png",
         caption: "Marketing materials showcase"
       }
     ]
@@ -166,7 +166,7 @@ export const caseStudies: CaseStudy[] = [
     id: '3',
     title: 'Social Media Growth Campaign',
     description: 'Strategic social media design campaign that dramatically increased follower engagement and reach.',
-    image: '/images/examples/instagram_post_example.png',
+    image: '/Images/examples/instagram_post_example.png',
     category: 'Social Media',
     results: {
       title: 'Follower Growth',
@@ -215,15 +215,15 @@ export const caseStudies: CaseStudy[] = [
     ],
     gallery: [
       {
-        image: "/images/examples/instagram_post_example.png",
+        image: "/Images/examples/instagram_post_example.png",
         caption: "Instagram feed design system"
       },
       {
-        image: "/images/examples/story_highlight_example.png",
+        image: "/Images/examples/story_highlight_example.png",
         caption: "Story highlights and templates"
       },
       {
-        image: "/images/examples/carousel_post_example.png",
+        image: "/Images/examples/carousel_post_example.png",
         caption: "Campaign performance analytics"
       }
     ]
