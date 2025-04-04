@@ -23,6 +23,9 @@ import { loadStripe, StripeError } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { CheckoutForm } from '@/components/checkout/checkout-form';
 
+// --->>> ADDING LOG HERE <<<---
+console.log("[Checkout Page Top Level] NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY:", process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
+
 interface Package {
   id: string;
   name: string;
