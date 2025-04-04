@@ -70,7 +70,7 @@ export default function Home() {
       <section className="relative py-12 sm:py-16 md:min-h-screen flex items-center justify-center overflow-hidden">
         {/* Background Effects */}
         <div className="absolute inset-0 bg-gradient-to-b from-white/60 to-white/90 z-10" />
-        <div className="absolute inset-0 bg-[url('/Images/hero_bg.png')] bg-cover bg-center blur-sm z-0" />
+        <div className="absolute inset-0 bg-[url('/images/hero_bg.png')] bg-cover bg-center blur-sm z-0" />
         
         {/* Animated Shapes */}
         <div className="absolute inset-0 overflow-hidden">
