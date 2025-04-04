@@ -65,7 +65,6 @@ function SignUpContent() {
       const result = await signIn('credentials', {
         email: formData.email,
         password: formData.password,
-        redirect: false,
         callbackUrl,
       });
 
@@ -73,14 +72,7 @@ function SignUpContent() {
         // Auto sign-in failed! Just show messages, don't redirect automatically.
         console.error("Auto sign-in failed after signup:", result.error);
         toast.error('Account created, but auto sign-in failed. Please sign in manually.');
-        // No automatic redirect here: router.push(...)
-        // Optionally clear the form or give other feedback
         setFormData({ name: '', email: '', password: '', confirmPassword: '' }); // Clear form
-
-      } else {
-        // Successful sign-in after signup
-        toast.success('Signed in successfully');
-        window.location.href = callbackUrl; // Redirect to the intended page or dashboard
       }
 
     } catch (error) {
