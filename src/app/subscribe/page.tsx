@@ -5,8 +5,8 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { useSession, signIn } from 'next-auth/react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
-import { CheckoutForm } from '@/components/checkout/checkout-form'; // Use the new form
-import { Navigation } from '@/components/layout/navigation'; // Assuming you have this
+import { CheckoutForm } from '@/components/checkout/checkout-form';
+import { Navigation } from '@/components/layout/navigation';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,8 +14,19 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from 'sonner';
 import { Loader2, CheckCircle2, ArrowRight, LockIcon, Info, Shield } from 'lucide-react';
-import { fetchPackages, Package } from '@/lib/packages'; // Adjust path if needed
 import Link from 'next/link';
+
+// Define Package type locally
+interface Package {
+  id: string;
+  name: string;
+  description?: string | null; // Make description optional
+  price: number;
+  originalPrice?: number | null; // Make originalPrice optional
+  features: string[]; // Assuming features will be parsed into string[]
+  isActive: boolean;
+  stripePriceId?: string | null; // Make stripePriceId optional
+}
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY || '');
 
@@ -38,8 +49,18 @@ function SubscribeContent() {
     const loadPackages = async () => {
       setLoadingPackages(true);
       try {
-        const fetchedPackages = await fetchPackages();
-        setPackages(fetchedPackages);
+        // Fetch from the API route
+        const response = await fetch('/api/packages'); 
+        if (!response.ok) {
+          throw new Error('Failed to fetch packages');
+        }
+        const fetchedPackages: Package[] = await response.json();
+         // Ensure features is always an array of strings
+        const processedPackages = fetchedPackages.map(pkg => ({
+          ...pkg,
+          features: Array.isArray(pkg.features) ? pkg.features : [],
+        }));
+        setPackages(processedPackages);
       } catch (error) {
         console.error("Failed to fetch packages:", error);
         toast.error("Could not load subscription plans.");
@@ -60,21 +81,18 @@ function SubscribeContent() {
         planToSelect = packages.find(p => p.name.toLowerCase() === planName.toLowerCase()) || null;
         if (planToSelect) {
           setSelectedPlan(planToSelect);
-          // Ensure URL reflects the plan, but only if it wasn't already there
           if (!planNameFromUrl) {
             router.replace(`/subscribe?plan=${planToSelect.name}`, { scroll: false });
           }
-          localStorage.removeItem('selectedCheckoutPlan'); // Clear after use
+          localStorage.removeItem('selectedCheckoutPlan');
         }
       }
-      // If no plan in URL/localStorage, or plan not found, don't select anything initially
     }
   }, [packages, planNameFromUrl, router]);
 
   // Redirect authenticated users with a plan directly to checkout
   useEffect(() => {
     if (status === 'authenticated' && selectedPlan) {
-      // Pass package ID instead of name to checkout
       router.push(`/checkout?package=${selectedPlan.id}`);
     }
   }, [status, selectedPlan, router]);
@@ -85,7 +103,6 @@ function SubscribeContent() {
     router.push(`/subscribe?plan=${pkg.name}`, { scroll: false });
   };
 
-  // --- Auth Handlers (Login/Signup) ---
   const handleAuthInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setAuthForm({ ...authForm, [e.target.name]: e.target.value });
   };
@@ -98,13 +115,12 @@ function SubscribeContent() {
          email: authForm.email,
          password: authForm.password,
          redirect: false,
-         callbackUrl: selectedPlan ? `/checkout?package=${selectedPlan.id}` : '/dashboard' // Redirect to checkout if plan selected
+         callbackUrl: selectedPlan ? `/checkout?package=${selectedPlan.id}` : '/dashboard'
        });
        if (result?.error) {
          toast.error(result.error === 'CredentialsSignin' ? 'Invalid email or password.' : 'Sign in failed.');
        } else {
          toast.success('Signed in successfully');
-         // Session update will trigger useEffect to redirect
          await update(); 
        }
      } catch (error) { toast.error('Sign in failed.'); }
@@ -119,7 +135,6 @@ function SubscribeContent() {
     }
     setAuthLoading(true);
     try {
-      // Check email first
       const checkRes = await fetch(`/api/auth/check-email?email=${encodeURIComponent(authForm.email)}`);
       const checkData = await checkRes.json();
       if (checkData.exists) {
@@ -128,18 +143,16 @@ function SubscribeContent() {
          setAuthLoading(false);
          return;
       }
-      // Register
       const regRes = await fetch('/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: authForm.name, email: authForm.email, password: authForm.password }) });
       if (!regRes.ok) throw new Error((await regRes.json()).message || 'Signup failed');
       toast.success('Account created!');
-      // Sign in
       const signInRes = await signIn('credentials', { email: authForm.email, password: authForm.password, redirect: false, callbackUrl: selectedPlan ? `/checkout?package=${selectedPlan.id}` : '/dashboard' });
       if (signInRes?.error) {
          toast.error('Auto sign-in failed. Please sign in manually.');
          setActiveTab('login');
       } else {
          toast.success('Signed in successfully');
-         await update(); // Session update triggers redirect
+         await update();
       }
     } catch (error: any) { toast.error(error.message || 'Signup failed'); }
     finally { setAuthLoading(false); }
@@ -151,10 +164,6 @@ function SubscribeContent() {
     return <div className="flex justify-center items-center min-h-[400px]"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   }
 
-  // If authenticated, this component shouldn't render (redirected by useEffect)
-  // If not authenticated, show plan selection or auth forms
-
-  // Step 1: Select a Plan (if none selected)
   if (!selectedPlan) {
     return (
        <div className="container mx-auto px-4 py-12">
@@ -164,7 +173,7 @@ function SubscribeContent() {
              <Card key={pkg.id} className="flex flex-col">
                <CardHeader>
                  <CardTitle>{pkg.name}</CardTitle>
-                 <CardDescription>{pkg.description}</CardDescription>
+                 <CardDescription>{pkg.description || ''}</CardDescription> {/* Added fallback */}
                </CardHeader>
                <CardContent className="flex-grow">
                  <p className="text-3xl font-bold mb-4">
@@ -172,7 +181,7 @@ function SubscribeContent() {
                    <span className="text-sm font-normal text-muted-foreground">/month</span>
                  </p>
                  <ul className="space-y-2 text-sm text-muted-foreground">
-                   {(pkg.features as string[]).map((feature, i) => (
+                   {pkg.features.map((feature, i) => (
                      <li key={i} className="flex items-center">
                        <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />
                        {feature}
@@ -192,7 +201,6 @@ function SubscribeContent() {
     );
   }
 
-  // Step 2: Login or Signup (if plan is selected but user not authenticated)
   if (status !== 'authenticated' && selectedPlan) {
      return (
       <div className="container mx-auto px-4 py-12">
@@ -212,7 +220,7 @@ function SubscribeContent() {
                    <hr />
                    <h4 className="font-medium">Features:</h4>
                    <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                     {(selectedPlan.features as string[]).map((feature, i) => <li key={i}>{feature}</li>)}
+                     {selectedPlan.features.map((feature, i) => <li key={i}>{feature}</li>)}
                    </ul>
                    <hr />
                    <div className="flex justify-between font-medium text-lg">
@@ -256,7 +264,6 @@ function SubscribeContent() {
                        <div className="space-y-1">
                          <Label htmlFor="login-password">Password</Label>
                          <Input id="login-password" name="password" type="password" required value={authForm.password} onChange={handleAuthInputChange} />
-                         {/* Add Forgot Password Link if needed */}
                        </div>
                        <Button type="submit" className="w-full" disabled={authLoading}>
                          {authLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
@@ -299,13 +306,11 @@ function SubscribeContent() {
       </div>
      );
   }
-
-  // Should not reach here if authenticated (redirected) or not authenticated (shows plan/auth)
+  
   return null; 
 }
 
 export default function SubscribePage() {
-  // You might want a layout component here that includes Navigation
   return (
     <>
       <Navigation /> 
