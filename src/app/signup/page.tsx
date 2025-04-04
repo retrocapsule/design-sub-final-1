@@ -10,6 +10,8 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { Navigation } from '@/components/layout/navigation';
+import Footer from '@/components/Footer';
 
 function SignUpContent() {
   const router = useRouter();
@@ -61,7 +63,7 @@ function SignUpContent() {
 
       toast.success('Account created successfully');
 
-      // 3. Sign in the new user
+      // 3. Sign in the new user (let next-auth handle redirect)
       const result = await signIn('credentials', {
         email: formData.email,
         password: formData.password,
@@ -69,7 +71,6 @@ function SignUpContent() {
       });
 
       if (result?.error) {
-        // Auto sign-in failed! Just show messages, don't redirect automatically.
         console.error("Auto sign-in failed after signup:", result.error);
         toast.error('Account created, but auto sign-in failed. Please sign in manually.');
         setFormData({ name: '', email: '', password: '', confirmPassword: '' }); // Clear form
@@ -84,7 +85,7 @@ function SignUpContent() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow-lg">
         <div className="text-center">
           <h2 className="mt-6 text-3xl font-bold text-gray-900">Create your account</h2>
@@ -164,8 +165,14 @@ function SignUpContent() {
 
 export default function SignUpPage() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <SignUpContent />
-    </Suspense>
+    <div className="flex flex-col min-h-screen">
+      <Navigation />
+      <main className="flex-grow">
+        <Suspense fallback={<div className="flex justify-center items-center min-h-[400px]"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+          <SignUpContent />
+        </Suspense>
+      </main>
+      <Footer />
+    </div>
   );
 } 
