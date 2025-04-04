@@ -70,8 +70,13 @@ function SignUpContent() {
       });
 
       if (result?.error) {
+        // Auto sign-in failed! Just show messages, don't redirect automatically.
+        console.error("Auto sign-in failed after signup:", result.error);
         toast.error('Account created, but auto sign-in failed. Please sign in manually.');
-        router.push(`/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+        // No automatic redirect here: router.push(...)
+        // Optionally clear the form or give other feedback
+        setFormData({ name: '', email: '', password: '', confirmPassword: '' }); // Clear form
+
       } else {
         // Successful sign-in after signup
         toast.success('Signed in successfully');
