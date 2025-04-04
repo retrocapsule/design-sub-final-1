@@ -10,8 +10,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { RequestMessages } from '@/components/admin/request-messages';
-import { Role } from '@prisma/client'; // Import Role enum
-import { AdminRequestControls } from '@/components/admin/AdminRequestControls'; // Import the new component
+import { AdminRequestControls } from '@/components/admin/AdminRequestControls';
 
 // Helper to get badge color based on status (copied from manager for consistency)
 const getStatusBadgeVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
@@ -44,7 +43,7 @@ const formatDate = (date: Date | undefined | null) => {
 async function getDesignRequest(id: string) {
     // Add admin check here too, maybe redundant if page access is checked but good practice
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== Role.ADMIN) {
+    if (!session?.user || session.user.role !== "ADMIN") {
         // Although the page checks access, API should ideally be protected too
         return null; // Or throw an error
     }
@@ -97,7 +96,7 @@ async function getDesignRequest(id: string) {
 // Fetch function for admin users
 async function getAdminUsers() {
     const admins = await prisma.user.findMany({
-        where: { role: Role.ADMIN },
+        where: { role: "ADMIN" },
         select: {
             id: true,
             name: true,
@@ -114,7 +113,7 @@ async function getAdminUsers() {
 export default async function DesignRequestDetailPage({ params: { id } }: { params: { id: string } }) {
     // Admin Check for Page Access
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== Role.ADMIN) {
+    if (!session?.user || session.user.role !== "ADMIN") {
         redirect("/signin?callbackUrl=/admin"); // Redirect non-admins
     }
 
@@ -130,7 +129,7 @@ export default async function DesignRequestDetailPage({ params: { id } }: { para
     // Map messages to include isFromAdmin and format createdAt
     const formattedMessages = request.messages.map(message => ({
         ...message,
-        isFromAdmin: message.user?.role === Role.ADMIN,
+        isFromAdmin: message.user?.role === "ADMIN",
         createdAt: message.createdAt.toISOString(), // Format date to ISO string
     }));
 
