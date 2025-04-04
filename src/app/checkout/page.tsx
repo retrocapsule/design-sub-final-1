@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/tabs";
 
 // ** NEW STRIPE IMPORTS **
-import { loadStripe, StripeError } from '@stripe/stripe-js';
+import { loadStripe, StripeError, Stripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { CheckoutForm } from '@/components/checkout/checkout-form';
 
@@ -37,9 +37,8 @@ interface Package {
   stripePriceId?: string | null;
 }
 
-// ** INITIALIZE STRIPE OUTSIDE COMPONENT **
-// Ensure NEXT_PUBLIC_STRIPE_PUBLIC_KEY is set in your .env.local
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY || '');
+// REMOVE top-level stripePromise initialization
+// const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '');
 
 // Wrapper component to handle search params and fetch package ID
 function CheckoutContent() {
@@ -57,6 +56,22 @@ function CheckoutContent() {
   const [authLoading, setAuthLoading] = useState(false);
   const [authForm, setAuthForm] = useState({ name: '', email: '', password: '', confirmPassword: '' });
   const [activeTab, setActiveTab] = useState('login');
+
+  // State for Stripe Promise
+  const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
+
+  // Effect to initialize Stripe Promise on mount
+  useEffect(() => {
+    const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+    if (key) {
+      console.log("[CheckoutContent Effect] Initializing Stripe with key:", key);
+      setStripePromise(loadStripe(key));
+    } else {
+      console.error("[CheckoutContent Effect] Stripe Publishable Key is missing!");
+      setError("Payment gateway configuration error. Cannot initialize checkout.");
+      toast.error("Checkout configuration error.");
+    }
+  }, []); // Run only once on mount
 
   // Fetch all packages on mount
   useEffect(() => {
@@ -170,7 +185,7 @@ function CheckoutContent() {
   };
 
   // Combined loading state for session and packages
-  if (status === 'loading' || loadingPackages) {
+  if (status === 'loading' || loadingPackages || !stripePromise) {
     return <div className="flex justify-center items-center py-10"><Loader2 className="h-8 w-8 animate-spin" /> Loading checkout...</div>;
   }
 
@@ -255,9 +270,11 @@ function CheckoutContent() {
                   </CardDescription>
               </CardHeader>
               <CardContent>
-                  <Elements stripe={stripePromise}>
-                      <CheckoutForm packageId={selectedPackage.id} />
-                  </Elements>
+                  {stripePromise && (
+                    <Elements stripe={stripePromise}>
+                        <CheckoutForm packageId={selectedPackage.id} />
+                    </Elements>
+                  )}
               </CardContent>
           </Card>
         ) : (
