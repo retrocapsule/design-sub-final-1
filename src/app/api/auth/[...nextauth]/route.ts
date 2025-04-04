@@ -26,8 +26,9 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials, req): Promise<NextAuthUser | null> {
+        console.log("[Auth] Authorize: Attempting authorization for", credentials?.email); // Log entry
         if (!credentials?.email || !credentials?.password) {
-          console.error("Authorize: Missing credentials");
+          console.error("[Auth] Authorize: Missing credentials");
           return null;
         }
 
@@ -37,29 +38,41 @@ export const authOptions: NextAuthOptions = {
           },
         });
 
-        if (!user || !user.password) {
-          console.error(`Authorize: User not found or no password for ${credentials.email}`);
+        if (!user) { // Check user existence first
+          console.error(`[Auth] Authorize: User not found for ${credentials.email}`);
           return null;
         }
 
-        const isPasswordValid = await compare(
-          credentials.password,
-          user.password
-        );
+        if (!user.password) { // Separately check if password field exists
+           console.error(`[Auth] Authorize: User ${credentials.email} found, but database record has no password field.`);
+           return null;
+        }
+        
+        console.log(`[Auth] Authorize: User found for ${credentials.email}. Comparing password.`);
+        let isPasswordValid = false;
+        try {
+            isPasswordValid = await compare(
+              credentials.password,
+              user.password
+            );
+        } catch (compareError) {
+            console.error(`[Auth] Authorize: Error during password comparison for ${credentials.email}:`, compareError);
+            return null; // Fail if comparison itself throws error
+        }
 
         if (!isPasswordValid) {
-          console.error(`Authorize: Invalid password for ${credentials.email}`);
+          console.error(`[Auth] Authorize: Invalid password for ${credentials.email}`);
           return null;
         }
 
-        console.log(`Authorize: Success for ${credentials.email}`);
-        // Return the user object matching NextAuthUser structure, including role
+        console.log(`[Auth] Authorize: Success for ${credentials.email}`);
+        // Return the user object matching NextAuthUser structure
         return {
           id: user.id,
           name: user.name,
           email: user.email,
           image: user.image,
-          role: user.role, // Include role to satisfy type checker
+          role: user.role,
         };
       },
     }),
