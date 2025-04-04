@@ -16,8 +16,31 @@ import { DesignRequest } from '@prisma/client';
 // Import the messaging component
 import RequestMessages from '@/components/admin/request-messages';
 
+// Define Message type (or import if defined elsewhere)
+interface Sender {
+  id: string;
+  name?: string | null;
+  email?: string | null;
+  image?: string | null;
+}
+interface Message {
+  id: string;
+  content: string;
+  createdAt: string;
+  isRead: boolean;
+  isFromAdmin: boolean;
+  userId: string;
+  user: Sender;
+}
+
 // Define a more complete type locally if needed, ensuring it matches schema
 interface ExtendedDesignRequest extends DesignRequest {
+  // Add user relation if it's included in the fetch
+  user?: {
+    id: string;
+    name?: string | null;
+    email?: string | null;
+  };
   priority: string;
   projectType: string;
   fileFormat: string;
@@ -30,12 +53,16 @@ export default function RequestDetailPage() {
   const params = useParams();
   const requestId = params.requestId as string;
   const { data: session, status } = useSession();
+  const currentUser = session?.user;
 
-  // Use the standard Prisma type
-  const [request, setRequest] = useState<DesignRequest | null>(null);
+  // Use the extended type to potentially include the user
+  const [request, setRequest] = useState<ExtendedDesignRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]); // State for messages
+  const [messagesLoading, setMessagesLoading] = useState(true);
+  const [messagesError, setMessagesError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchRequest = async () => {
@@ -52,8 +79,8 @@ export default function RequestDetailPage() {
           const errorData = await response.json().catch(() => ({}));
           throw new Error(errorData.error || `Failed to fetch request: ${response.statusText}`);
         }
-        // Set state with the standard type
-        const data: DesignRequest = await response.json();
+        // Set state using the extended type
+        const data: ExtendedDesignRequest = await response.json();
         setRequest(data);
       } catch (err) {
         console.error("Error fetching request:", err);
@@ -66,6 +93,34 @@ export default function RequestDetailPage() {
     };
     fetchRequest();
   }, [requestId, status, router]);
+
+  // useEffect for fetching messages
+  useEffect(() => {
+    const fetchMessages = async () => {
+      if (!requestId) return;
+      setMessagesLoading(true);
+      setMessagesError(null);
+      try {
+        // Assume API endpoint exists and accepts requestId query param
+        const response = await fetch(`/api/messages?requestId=${requestId}`); 
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || `Failed to fetch messages: ${response.statusText}`);
+        }
+        const data: Message[] = await response.json();
+        setMessages(data);
+      } catch (err) {
+        console.error("Error fetching messages:", err);
+        const message = err instanceof Error ? err.message : "An unknown error occurred";
+        setMessagesError(message);
+        toast.error(`Failed to load messages: ${message}`);
+      } finally {
+        setMessagesLoading(false);
+      }
+    };
+
+    fetchMessages();
+  }, [requestId]); // Re-run if requestId changes
 
   const handleDelete = async () => {
     if (!window.confirm("Are you sure you want to delete this request? This action cannot be undone.")) return;
@@ -115,10 +170,11 @@ export default function RequestDetailPage() {
   };
 
   // --- Return early for loading, error, or not found states --- 
-  if (loading || status === 'loading') {
+  if (loading || status === 'loading' || messagesLoading) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="ml-2 text-muted-foreground">Loading request data...</p>
       </div>
     );
   }
@@ -143,6 +199,14 @@ export default function RequestDetailPage() {
       </div>
     );
   }
+
+  // Extract requestUser info from the fetched request object
+  // Add checks for existence
+  const requestUser = request?.user ? { 
+      id: request.user.id, 
+      name: request.user.name, 
+      email: request.user.email 
+  } : undefined;
 
   // --- Main component render: TypeScript now knows request is not null --- 
   return (
@@ -204,12 +268,25 @@ export default function RequestDetailPage() {
         </Card>
       </div>
 
-      {/* Add the RequestMessages component after the details card */}
-      {/* Ensure requestId is defined and pass it as a prop */}
-      {requestId && (
-        <div className="mt-8"> {/* Add some margin top */}
-          <RequestMessages requestId={requestId} />
+      {/* Add the RequestMessages component */}
+      {/* Check for all required props and handle message loading/error */}
+      {requestId && requestUser && currentUser && (
+        <div className="mt-8">
+          {messagesLoading && <p>Loading messages...</p>}
+          {messagesError && <p className="text-red-500">Error loading messages: {messagesError}</p>}
+          {!messagesLoading && !messagesError && (
+            <RequestMessages 
+              requestId={requestId} 
+              initialMessages={messages} // Pass fetched messages
+              requestUser={requestUser} 
+              currentUser={currentUser} 
+            />
+          )}
         </div>
+      )}
+      {/* Add a message if requestUser couldn't be determined */}
+      {!requestUser && request && (
+          <p className="text-red-500 mt-4">Error: Could not determine the user associated with this request.</p>
       )}
     </>
   );
