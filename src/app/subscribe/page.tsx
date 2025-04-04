@@ -1,342 +1,317 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useSession } from 'next-auth/react';
-import Link from 'next/link';
-import { Navigation } from '@/components/layout/navigation';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Loader2, CreditCard, Shield, CheckCircle2, ArrowRight, Info, Sparkles } from 'lucide-react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { useSession, signIn } from 'next-auth/react';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements } from '@stripe/react-stripe-js';
+import { CheckoutForm } from '@/components/checkout/checkout-form'; // Use the new form
+import { Navigation } from '@/components/layout/navigation'; // Assuming you have this
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from 'sonner';
+import { Loader2, CheckCircle2, ArrowRight, LockIcon, Info, Shield } from 'lucide-react';
+import { fetchPackages, Package } from '@/lib/packages'; // Adjust path if needed
+import Link from 'next/link';
 
-interface Package {
-  id: string;
-  name: string;
-  originalPrice: number;
-  price: number;
-  features: any;  // JSON type from Prisma
-  isActive: boolean;
-}
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY || '');
 
-export default function SubscribePage() {
+function SubscribeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { data: session, status } = useSession();
-  const [loading, setLoading] = useState(false);
+  const { data: session, status, update } = useSession();
+  
+  const [packages, setPackages] = useState<Package[]>([]);
   const [selectedPlan, setSelectedPlan] = useState<Package | null>(null);
-  const plan = searchParams.get('plan');
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    cardNumber: '',
-    expiryDate: '',
-    cvc: '',
-    zipCode: ''
-  });
+  const [loadingPackages, setLoadingPackages] = useState(true);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authForm, setAuthForm] = useState({ name: '', email: '', password: '', confirmPassword: '' });
+  const [activeTab, setActiveTab] = useState('login');
 
+  const planNameFromUrl = searchParams.get('plan');
+
+  // Fetch packages on mount
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      // Store the current URL to redirect back after sign in
-      const currentUrl = window.location.href;
-      router.push(`/signin?callbackUrl=${encodeURIComponent(currentUrl)}`);
-    }
-  }, [status, router]);
-
-  useEffect(() => {
-    if (session?.user?.name) {
-      setFormData(prev => ({
-        ...prev,
-        name: session.user.name || ''
-      }));
-    }
-  }, [session]);
-
-  useEffect(() => {
-    if (plan) {
-      fetchPackage();
-    }
-  }, [plan]);
-
-  const fetchPackage = async () => {
-    try {
-      const response = await fetch('/api/packages');
-      const data = await response.json();
-      const foundPlan = data.find((pkg: Package) => pkg.name.toLowerCase() === plan?.toLowerCase());
-      if (foundPlan) {
-        setSelectedPlan(foundPlan);
+    const loadPackages = async () => {
+      setLoadingPackages(true);
+      try {
+        const fetchedPackages = await fetchPackages();
+        setPackages(fetchedPackages);
+      } catch (error) {
+        console.error("Failed to fetch packages:", error);
+        toast.error("Could not load subscription plans.");
+      } finally {
+        setLoadingPackages(false);
       }
-    } catch (error) {
-      console.error('Error fetching package:', error);
-      toast.error('Failed to fetch package details');
+    };
+    loadPackages();
+  }, []);
+
+  // Set selected plan based on URL or localStorage
+  useEffect(() => {
+    if (packages.length > 0) {
+      let planToSelect: Package | null = null;
+      const planName = planNameFromUrl || localStorage.getItem('selectedCheckoutPlan');
+
+      if (planName) {
+        planToSelect = packages.find(p => p.name.toLowerCase() === planName.toLowerCase()) || null;
+        if (planToSelect) {
+          setSelectedPlan(planToSelect);
+          // Ensure URL reflects the plan, but only if it wasn't already there
+          if (!planNameFromUrl) {
+            router.replace(`/subscribe?plan=${planToSelect.name}`, { scroll: false });
+          }
+          localStorage.removeItem('selectedCheckoutPlan'); // Clear after use
+        }
+      }
+      // If no plan in URL/localStorage, or plan not found, don't select anything initially
     }
+  }, [packages, planNameFromUrl, router]);
+
+  // Redirect authenticated users with a plan directly to checkout
+  useEffect(() => {
+    if (status === 'authenticated' && selectedPlan) {
+      // Pass package ID instead of name to checkout
+      router.push(`/checkout?package=${selectedPlan.id}`);
+    }
+  }, [status, selectedPlan, router]);
+  
+  const handleSelectPlan = (pkg: Package) => {
+    setSelectedPlan(pkg);
+    localStorage.setItem('selectedCheckoutPlan', pkg.name);
+    router.push(`/subscribe?plan=${pkg.name}`, { scroll: false });
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+  // --- Auth Handlers (Login/Signup) ---
+  const handleAuthInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setAuthForm({ ...authForm, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
+     e.preventDefault();
+     setAuthLoading(true);
+     try {
+       const result = await signIn('credentials', {
+         email: authForm.email,
+         password: authForm.password,
+         redirect: false,
+         callbackUrl: selectedPlan ? `/checkout?package=${selectedPlan.id}` : '/dashboard' // Redirect to checkout if plan selected
+       });
+       if (result?.error) {
+         toast.error(result.error === 'CredentialsSignin' ? 'Invalid email or password.' : 'Sign in failed.');
+       } else {
+         toast.success('Signed in successfully');
+         // Session update will trigger useEffect to redirect
+         await update(); 
+       }
+     } catch (error) { toast.error('Sign in failed.'); }
+     finally { setAuthLoading(false); }
+   };
+
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-
+    if (authForm.password !== authForm.confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    setAuthLoading(true);
     try {
-      const response = await fetch('/api/stripe/checkout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ plan }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Something went wrong');
+      // Check email first
+      const checkRes = await fetch(`/api/auth/check-email?email=${encodeURIComponent(authForm.email)}`);
+      const checkData = await checkRes.json();
+      if (checkData.exists) {
+         toast.error('Email already exists. Please sign in.');
+         setActiveTab('login');
+         setAuthLoading(false);
+         return;
       }
-
-      // Redirect to success page
-      router.push('/onboarding');
-    } catch (error) {
-      console.error(error);
-      toast.error(error instanceof Error ? error.message : 'Failed to process payment');
-      setLoading(false);
-    }
+      // Register
+      const regRes = await fetch('/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: authForm.name, email: authForm.email, password: authForm.password }) });
+      if (!regRes.ok) throw new Error((await regRes.json()).message || 'Signup failed');
+      toast.success('Account created!');
+      // Sign in
+      const signInRes = await signIn('credentials', { email: authForm.email, password: authForm.password, redirect: false, callbackUrl: selectedPlan ? `/checkout?package=${selectedPlan.id}` : '/dashboard' });
+      if (signInRes?.error) {
+         toast.error('Auto sign-in failed. Please sign in manually.');
+         setActiveTab('login');
+      } else {
+         toast.success('Signed in successfully');
+         await update(); // Session update triggers redirect
+      }
+    } catch (error: any) { toast.error(error.message || 'Signup failed'); }
+    finally { setAuthLoading(false); }
   };
 
-  const getFeatures = (pkg: Package): string[] => {
-    try {
-      return Array.isArray(pkg.features) ? pkg.features : [];
-    } catch (error) {
-      console.error('Error getting features:', error);
-      return [];
-    }
-  };
+  // --- Render Logic ---
 
-  if (status === 'loading') {
+  if (status === 'loading' || loadingPackages) {
+    return <div className="flex justify-center items-center min-h-[400px]"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  }
+
+  // If authenticated, this component shouldn't render (redirected by useEffect)
+  // If not authenticated, show plan selection or auth forms
+
+  // Step 1: Select a Plan (if none selected)
+  if (!selectedPlan) {
     return (
-      <div className="flex flex-col min-h-screen">
-        <Navigation />
-        <div className="flex-1 flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin" />
-        </div>
-      </div>
+       <div className="container mx-auto px-4 py-12">
+         <h1 className="text-3xl font-bold text-center mb-8">Choose Your Plan</h1>
+         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+           {packages.map((pkg) => (
+             <Card key={pkg.id} className="flex flex-col">
+               <CardHeader>
+                 <CardTitle>{pkg.name}</CardTitle>
+                 <CardDescription>{pkg.description}</CardDescription>
+               </CardHeader>
+               <CardContent className="flex-grow">
+                 <p className="text-3xl font-bold mb-4">
+                   ${pkg.price}
+                   <span className="text-sm font-normal text-muted-foreground">/month</span>
+                 </p>
+                 <ul className="space-y-2 text-sm text-muted-foreground">
+                   {(pkg.features as string[]).map((feature, i) => (
+                     <li key={i} className="flex items-center">
+                       <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />
+                       {feature}
+                     </li>
+                   ))}
+                 </ul>
+               </CardContent>
+               <CardFooter>
+                 <Button className="w-full" onClick={() => handleSelectPlan(pkg)}>
+                   Select Plan
+                 </Button>
+               </CardFooter>
+             </Card>
+           ))}
+         </div>
+       </div>
     );
   }
 
-  if (!plan) {
-    return (
-      <div className="flex flex-col min-h-screen">
-        <Navigation />
-        <div className="flex-1 flex items-center justify-center">
-          <Card className="w-full max-w-md">
-            <CardHeader>
-              <CardTitle>No Plan Selected</CardTitle>
-              <CardDescription>
-                Please select a plan from the pricing page to continue.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button
-                className="w-full"
-                onClick={() => router.push('/pricing')}
-              >
-                View Plans
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
+  // Step 2: Login or Signup (if plan is selected but user not authenticated)
+  if (status !== 'authenticated' && selectedPlan) {
+     return (
+      <div className="container mx-auto px-4 py-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-start">
+          {/* Order Summary */}
+          <div className="space-y-6 sticky top-24">
+             <Card>
+               <CardHeader>
+                 <CardTitle>Order Summary</CardTitle>
+               </CardHeader>
+               <CardContent>
+                 <div className="space-y-4">
+                   <div className="flex justify-between items-center">
+                     <h3 className="font-medium">{selectedPlan.name} Plan</h3>
+                     <p className="font-medium">${selectedPlan.price.toFixed(2)}/month</p>
+                   </div>
+                   <hr />
+                   <h4 className="font-medium">Features:</h4>
+                   <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                     {(selectedPlan.features as string[]).map((feature, i) => <li key={i}>{feature}</li>)}
+                   </ul>
+                   <hr />
+                   <div className="flex justify-between font-medium text-lg">
+                      <span>Total Due Today</span>
+                      <span>${selectedPlan.price.toFixed(2)}</span>
+                   </div>
+                 </div>
+               </CardContent>
+             </Card>
+              <Card className="bg-yellow-50 border-yellow-200">
+                 <CardHeader className="flex flex-row items-center space-x-3">
+                   <Info className="h-5 w-5 text-yellow-700" />
+                   <div>
+                     <CardTitle className="text-base text-yellow-800">Action Required</CardTitle>
+                     <CardDescription className="text-yellow-700">
+                       Please sign in or create an account to complete your subscription.
+                     </CardDescription>
+                   </div>
+                 </CardHeader>
+               </Card>
+          </div>
 
-  return (
-    <div className="flex flex-col min-h-screen">
-      <Navigation />
-      
-      <div className="flex-1 py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Order Summary */}
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Order Summary</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <h3 className="font-medium">{selectedPlan?.name} Plan</h3>
-                        <p className="text-sm text-muted-foreground">Monthly subscription</p>
-                      </div>
-                      <div className="text-right">
-                        <div className="flex items-center justify-end">
-                          <span className="text-sm text-muted-foreground line-through mr-2">
-                            ${selectedPlan?.originalPrice}
-                          </span>
-                          <span className="font-medium">${selectedPlan?.price}</span>
-                        </div>
-                        <p className="text-sm text-green-600">50% OFF</p>
-                        <p className="text-sm text-muted-foreground">/month</p>
-                      </div>
-                    </div>
-                    <div className="border-t pt-4">
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium">Total</span>
-                        <div className="text-right">
-                          <div className="flex items-center justify-end">
-                            <span className="text-sm text-muted-foreground line-through mr-2">
-                              ${selectedPlan?.originalPrice}
-                            </span>
-                            <span className="font-medium">${selectedPlan?.price}</span>
-                          </div>
-                          <p className="text-sm text-green-600">50% OFF</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>What's Included</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-3">
-                    {selectedPlan && getFeatures(selectedPlan).map((feature, index) => (
-                      <li key={index} className="flex items-center">
-                        <CheckCircle2 className="h-5 w-5 text-green-500 mr-2" />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-
-              <div className="bg-primary/5 p-4 rounded-lg">
-                <div className="flex items-start">
-                  <Info className="h-5 w-5 text-primary mr-2 mt-0.5" />
-                  <div>
-                    <h4 className="font-medium">Secure Payment</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Your payment information is encrypted and secure. We never store your card details.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Payment Form */}
+          {/* Auth Form */}
+          <div>
             <Card>
               <CardHeader>
-                <CardTitle>Payment Details</CardTitle>
-                <CardDescription>
-                  Complete your subscription with secure payment
-                </CardDescription>
+                 <CardTitle>{activeTab === 'login' ? 'Sign In' : 'Create Account'}</CardTitle>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="name">Cardholder Name</Label>
-                      <Input
-                        id="name"
-                        name="name"
-                        value={formData.name}
-                        onChange={handleInputChange}
-                        placeholder="John Doe"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="cardNumber">Card Number</Label>
-                      <div className="relative">
-                        <CreditCard className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="cardNumber"
-                          name="cardNumber"
-                          value={formData.cardNumber}
-                          onChange={handleInputChange}
-                          placeholder="1234 5678 9012 3456"
-                          className="pl-10"
-                          required
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="expiryDate">Expiry Date</Label>
-                        <Input
-                          id="expiryDate"
-                          name="expiryDate"
-                          value={formData.expiryDate}
-                          onChange={handleInputChange}
-                          placeholder="MM/YY"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="cvc">CVC</Label>
-                        <Input
-                          id="cvc"
-                          name="cvc"
-                          value={formData.cvc}
-                          onChange={handleInputChange}
-                          placeholder="123"
-                          required
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="zipCode">ZIP Code</Label>
-                      <Input
-                        id="zipCode"
-                        name="zipCode"
-                        value={formData.zipCode}
-                        onChange={handleInputChange}
-                        placeholder="12345"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    size="lg"
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        Subscribe Now
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                      </>
-                    )}
-                  </Button>
-
-                  <div className="flex items-center justify-center text-sm text-muted-foreground">
-                    <Shield className="h-4 w-4 mr-2" />
-                    <span>Secure payment powered by Stripe</span>
-                  </div>
-                </form>
+                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                   <TabsList className="grid w-full grid-cols-2">
+                     <TabsTrigger value="login">Sign In</TabsTrigger>
+                     <TabsTrigger value="signup">Create Account</TabsTrigger>
+                   </TabsList>
+                   <TabsContent value="login">
+                     <form onSubmit={handleLogin} className="space-y-4 pt-4">
+                       <div className="space-y-1">
+                         <Label htmlFor="login-email">Email</Label>
+                         <Input id="login-email" name="email" type="email" required value={authForm.email} onChange={handleAuthInputChange} />
+                       </div>
+                       <div className="space-y-1">
+                         <Label htmlFor="login-password">Password</Label>
+                         <Input id="login-password" name="password" type="password" required value={authForm.password} onChange={handleAuthInputChange} />
+                         {/* Add Forgot Password Link if needed */}
+                       </div>
+                       <Button type="submit" className="w-full" disabled={authLoading}>
+                         {authLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                         Sign In & Continue
+                       </Button>
+                     </form>
+                   </TabsContent>
+                   <TabsContent value="signup">
+                     <form onSubmit={handleSignup} className="space-y-4 pt-4">
+                        <div className="space-y-1">
+                         <Label htmlFor="signup-name">Name</Label>
+                         <Input id="signup-name" name="name" required value={authForm.name} onChange={handleAuthInputChange} />
+                       </div>
+                       <div className="space-y-1">
+                         <Label htmlFor="signup-email">Email</Label>
+                         <Input id="signup-email" name="email" type="email" required value={authForm.email} onChange={handleAuthInputChange} />
+                       </div>
+                       <div className="space-y-1">
+                         <Label htmlFor="signup-password">Password</Label>
+                         <Input id="signup-password" name="password" type="password" required minLength={8} value={authForm.password} onChange={handleAuthInputChange} />
+                       </div>
+                       <div className="space-y-1">
+                         <Label htmlFor="signup-confirmPassword">Confirm Password</Label>
+                         <Input id="signup-confirmPassword" name="confirmPassword" type="password" required value={authForm.confirmPassword} onChange={handleAuthInputChange} />
+                       </div>
+                        <p className="text-xs text-muted-foreground">
+                           By creating an account, you agree to our <Link href="/terms" className="underline">Terms</Link> and <Link href="/privacy" className="underline">Privacy Policy</Link>.
+                         </p>
+                       <Button type="submit" className="w-full" disabled={authLoading}>
+                         {authLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                         Create Account & Continue
+                       </Button>
+                     </form>
+                   </TabsContent>
+                 </Tabs>
               </CardContent>
             </Card>
           </div>
         </div>
       </div>
-    </div>
+     );
+  }
+
+  // Should not reach here if authenticated (redirected) or not authenticated (shows plan/auth)
+  return null; 
+}
+
+export default function SubscribePage() {
+  // You might want a layout component here that includes Navigation
+  return (
+    <>
+      <Navigation /> 
+      <Suspense fallback={<div className="flex justify-center items-center min-h-[400px]"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+        <SubscribeContent />
+      </Suspense>
+    </>
   );
 } 
