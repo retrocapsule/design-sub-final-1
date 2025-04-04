@@ -136,7 +136,6 @@ export function RequestMessages({
         body: JSON.stringify({
           content: newMessage,
           designRequestId: designRequestId,
-          recipientId: requestUser.id, // Explicitly set recipient for admin sending
         }),
       });
 
