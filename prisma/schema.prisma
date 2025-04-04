@@ -152,15 +152,17 @@ model Service {
 }
 
 model Package {
-  id            String         @id @default(cuid())
-  name          String         @unique
-  originalPrice Int
-  price         Int
-  features      Json
-  isActive      Boolean        @default(true)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  subscriptions Subscription[]
+  id              String   @id @default(cuid())
+  name            String
+  description     String?
+  price           Float
+  originalPrice   Float?
+  features        Json
+  isActive        Boolean  @default(true)
+  stripePriceId   String?  @unique
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  subscriptions   Subscription[]
 }
 
 model Subscription {
