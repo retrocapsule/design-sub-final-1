@@ -276,8 +276,8 @@ export default function RequestDetailPage() {
           {messagesError && <p className="text-red-500">Error loading messages: {messagesError}</p>}
           {!messagesLoading && !messagesError && (
             <RequestMessages 
-              requestId={requestId} 
-              initialMessages={messages} // Pass fetched messages
+              designRequestId={requestId} 
+              initialMessages={messages} 
               requestUser={requestUser} 
               currentUser={currentUser} 
             />
