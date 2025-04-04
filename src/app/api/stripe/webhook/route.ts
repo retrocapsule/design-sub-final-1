@@ -82,197 +82,118 @@ async function activateSubscription(subscriptionId: string, customerId: string) 
     }
 }
 
+async function deactivateSubscription(subscription: Stripe.Subscription) {
+  console.log('[Webhook: deactivateSubscription] Deactivating subscription:', subscription.id);
+  try {
+    await prisma.user.update({
+      where: {
+        subscriptionId: subscription.id,
+      },
+      data: {
+        subscriptionStatus: 'inactive', // Or map from subscription.status
+      },
+    });
+    console.log('[Webhook: deactivateSubscription] User subscription status updated to inactive in DB for subscription:', subscription.id);
+  } catch (error) {
+    console.error('[Webhook: deactivateSubscription] Error updating user subscription status:', error);
+  }
+}
+
 export async function POST(request: Request) {
-  console.log('[Webhook: POST - DEBUG] Received request');
+  console.log('[Webhook: POST] Received request');
   let event: Stripe.Event;
+
+  if (!webhookSecret) {
+    console.error('[Webhook: POST] STRIPE_WEBHOOK_SECRET not set in environment variables.');
+    return NextResponse.json({ error: 'Webhook secret is not configured.' }, { status: 500 });
+  }
 
   try {
     const body = await request.text();
     const headersList = headers();
     const signature = headersList.get('stripe-signature');
 
-    if (!signature || !webhookSecret) {
-      console.error('[Webhook: POST - DEBUG] Missing Stripe signature or webhook secret.');
-      return NextResponse.json(
-        { error: 'Webhook configuration error.' },
-        { status: 400 } // Keep 400 for config errors
-      );
+    if (!signature) {
+      console.error('[Webhook: POST] Missing Stripe signature.');
+      return NextResponse.json({ error: 'Missing Stripe signature.' }, { status: 400 });
     }
-    console.log('[Webhook: POST - DEBUG] Found signature and secret. Constructing event...');
+    console.log('[Webhook: POST] Found signature and secret. Constructing event...');
 
     event = stripe.webhooks.constructEvent(
       body,
       signature,
       webhookSecret
     );
-    console.log(`[Webhook: POST - DEBUG] Event constructed successfully: ${event.type} (${event.id})`);
+    console.log(`[Webhook: POST] Event constructed successfully: ${event.type} (${event.id})`);
 
   } catch (err: any) {
-    console.error('[Webhook: POST - DEBUG] Error constructing webhook event:', err.message);
+    console.error('[Webhook: POST] Error constructing webhook event:', err.message);
     return NextResponse.json({ error: `Webhook Error: ${err.message}` }, { status: 400 });
   }
 
-  // --- TEMPORARILY BYPASS EVENT PROCESSING --- 
-  console.log(`[Webhook: POST - DEBUG] Bypassing detailed processing for event type: ${event.type}. Returning 200 OK.`);
-  return NextResponse.json({ received: true }, { status: 200 });
-
-  /* // --- Original Handling Logic (Commented Out) --- 
+  // --- Handle Specific Events --- 
   try {
     switch (event.type) {
-      // ** Handle payment success for the FIRST invoice of a new subscription (Elements flow) **
       case 'invoice.payment_succeeded': {
         const invoice = event.data.object as Stripe.Invoice;
-        console.log(`[Webhook: invoice.payment_succeeded] Processing invoice ${invoice.id}, billing reason: ${invoice.billing_reason}`);
-        
-        // Check if it's the first invoice for a new subscription
-        if (invoice.billing_reason === 'subscription_create') {
-          const subscriptionId = invoice.subscription as string;
-          const customerId = invoice.customer as string;
-          
-          if (!subscriptionId || !customerId) {
-             console.error(`[Webhook: invoice.payment_succeeded] Missing subscriptionId or customerId on invoice ${invoice.id}`);
-             break; // Or return error response
-          }
-          
-          console.log(`[Webhook: invoice.payment_succeeded] First invoice payment for subscription ${subscriptionId}. Triggering activation.`);
-          await activateSubscription(subscriptionId, customerId);
+        console.log(`[Webhook: POST] Handling invoice.payment_succeeded for invoice: ${invoice.id}`);
+        // Check if it's for a subscription
+        if (invoice.subscription) {
+          const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
+          await activateSubscription(invoice.subscription as string, invoice.customer as string);
         } else {
-            console.log(`[Webhook: invoice.payment_succeeded] Ignoring invoice ${invoice.id} - not for subscription creation (reason: ${invoice.billing_reason}).`);
+            console.log('[Webhook: POST] Invoice payment succeeded, but not for a subscription.');
         }
         break;
       }
 
-      // Handle activation from the old redirect flow (optional fallback)
       case 'checkout.session.completed': {
-        const session = event.data.object as Stripe.Checkout.Session;
-        console.log(`[Webhook: checkout.session.completed] Processing session ${session.id}`);
-        
-        // Important: Check payment status on the session
-        if (session.payment_status === 'paid') {
-            const subscriptionId = session.subscription as string;
-            const customerId = session.customer as string;
-
-             if (!subscriptionId || !customerId) {
-                console.error(`[Webhook: checkout.session.completed] Missing subscriptionId or customerId on session ${session.id}`);
-                break; // Or return error response
-             }
-
-            console.log(`[Webhook: checkout.session.completed] Session payment successful for subscription ${subscriptionId}. Triggering activation.`);
-            // We can reuse the same activation logic
-            await activateSubscription(subscriptionId, customerId);
-        } else {
-             console.log(`[Webhook: checkout.session.completed] Ignoring session ${session.id} - payment status is ${session.payment_status}.`);
-        }
-        break;
+          const session = event.data.object as Stripe.Checkout.Session;
+          console.log(`[Webhook: POST] Handling checkout.session.completed for session: ${session.id}`);
+          // This often fires *before* invoice.payment_succeeded for the initial sub creation
+          // You might activate here, or rely on invoice.payment_succeeded
+          if (session.mode === 'subscription' && session.subscription) {
+              const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
+              await activateSubscription(session.subscription as string, session.customer as string);
+          } else {
+              console.log('[Webhook: POST] Checkout session completed, but not for a subscription mode or missing subscription ID.');
+          }
+          break;
       }
 
-      // Handle subscription changes (plan change, cancellation initiated by user/API)
       case 'customer.subscription.updated': {
         const subscription = event.data.object as Stripe.Subscription;
-        console.log(`[Webhook: customer.subscription.updated] Processing subscription ${subscription.id}, status: ${subscription.status}`);
-        const userId = subscription.metadata?.userId;
-
-        if (!userId) {
-          console.error('[Webhook: customer.subscription.updated] Missing userId in subscription metadata');
-          break;
+        console.log(`[Webhook: POST] Handling customer.subscription.updated for subscription: ${subscription.id}, Status: ${subscription.status}`);
+        // Handle changes like plan upgrades/downgrades or status changes (e.g., past_due)
+        if (subscription.status === 'active') {
+          await activateSubscription(subscription.id, subscription.customer as string);
+        } else {
+          // Handle other statuses if needed (e.g., past_due, unpaid, canceled)
+          // For simplicity, we might just rely on deleted for full deactivation
+           console.log(`[Webhook: POST] Subscription status is ${subscription.status}, not activating.`);
+           // Consider adding specific logic for 'canceled', 'past_due' etc. if needed.
         }
-        
-        const priceId = subscription.items.data[0]?.price?.id;
-        if (!priceId) {
-            console.error(`[Webhook: customer.subscription.updated] Missing priceId in subscription items for ${subscription.id}`);
-            break;
-        }
-        
-        // Find the package associated with the new priceId
-        // This requires mapping price IDs back to your internal packages
-        // You might need a more robust way if price IDs don't map clearly
-        let packageId: string | undefined;
-        for (const key in STRIPE_PRICE_IDS) {
-            if (STRIPE_PRICE_IDS[key as keyof typeof STRIPE_PRICE_IDS] === priceId) {
-                 const pkg = await prisma.package.findFirst({ where: { name: key }});
-                 if(pkg) packageId = pkg.id;
-                 break;
-            }
-        }
-        
-         if (!packageId) {
-            console.error(`[Webhook: customer.subscription.updated] Could not map Stripe Price ID ${priceId} back to a local Package.`);
-            // Decide how to handle this - maybe just update status?
-        }
-
-        // Update user's status
-        await prisma.user.updateMany({
-          where: { id: userId }, // Use updateMany in case user somehow has multiple entries (shouldn't happen with unique constraint)
-          data: {
-            subscriptionStatus: subscription.status,
-            subscriptionId: subscription.id, // Ensure subscription ID is up-to-date
-          },
-        });
-
-        // Update subscription record in DB
-        await prisma.subscription.updateMany({
-          where: { stripeSubscriptionId: subscription.id },
-          data: {
-            status: subscription.status,
-            stripePriceId: priceId,
-            packageId: packageId, // Update package if found
-            // Update period end if needed
-            // currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-          },
-        });
-         console.log(`[Webhook: customer.subscription.updated] Updated DB for user ${userId}, subscription ${subscription.id} to status ${subscription.status}`);
         break;
       }
 
-      // Handle subscription cancellations (e.g., end of billing period after cancel request)
       case 'customer.subscription.deleted': {
         const subscription = event.data.object as Stripe.Subscription;
-         console.log(`[Webhook: customer.subscription.deleted] Processing deleted subscription ${subscription.id}`);
-        // Note: status might be 'canceled' before it's deleted.
-        // This event fires when the subscription is truly gone.
-        const userId = subscription.metadata?.userId;
-
-        if (!userId) {
-          console.error('[Webhook: customer.subscription.deleted] Missing userId in subscription metadata');
-          break;
-        }
-
-        // Update user's status to inactive
-        await prisma.user.updateMany({
-          where: { id: userId, stripeSubscriptionId: subscription.id }, // Be specific
-          data: {
-            subscriptionStatus: 'inactive',
-            subscriptionId: null,
-          },
-        });
-
-        // Update subscription record status in DB to canceled
-        await prisma.subscription.updateMany({
-          where: { stripeSubscriptionId: subscription.id },
-          data: {
-            status: 'canceled', 
-          },
-        });
-         console.log(`[Webhook: customer.subscription.deleted] Updated DB for user ${userId}, marked subscription ${subscription.id} as canceled.`);
+        console.log(`[Webhook: POST] Handling customer.subscription.deleted for subscription: ${subscription.id}`);
+        // Sent when a subscription is canceled or ends
+        await deactivateSubscription(subscription);
         break;
       }
-      
-       default: {
-            console.log(`[Webhook: POST] Unhandled event type: ${event.type}`);
-        }
+
+      default:
+        console.log(`[Webhook: POST] Unhandled event type ${event.type}`);
     }
 
-    // Return a 200 response to acknowledge receipt of the event
-    return NextResponse.json({ received: true });
+    // Return success after handling (or ignoring) the event
+    return NextResponse.json({ received: true }, { status: 200 });
 
   } catch (error: any) {
-     // Centralized error handling for event processing
-     console.error(`[Webhook: POST] Error processing event ${event?.id} (Type: ${event?.type}):`, error);
-     // Optionally send error details back, but be cautious with sensitive info
-     return NextResponse.json(
-       { error: 'Webhook handler failed during event processing.', details: error.message },
-       { status: 500 } // Use 500 for server-side processing errors
-     );
+    console.error(`[Webhook: POST] Error handling event ${event.type}:`, error);
+    // Return 500 if error during actual processing
+    return NextResponse.json({ error: 'Webhook handler failed processing event.' }, { status: 500 });
   }
-  */
 } 
