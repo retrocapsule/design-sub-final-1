@@ -13,8 +13,8 @@ import { DesignRequest } from '@prisma/client';
 // Import Alert Dialog components if available (using browser confirm for now)
 // import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 
-// Import the messaging component
-import RequestMessages from '@/components/admin/request-messages';
+// Correctly import the named export RequestMessages
+import { RequestMessages } from '@/components/admin/request-messages';
 
 // Define Message type (or import if defined elsewhere)
 interface Sender {
