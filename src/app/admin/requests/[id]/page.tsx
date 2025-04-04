@@ -127,6 +127,13 @@ export default async function DesignRequestDetailPage({ params: { id } }: { para
     // Should not happen if getDesignRequest handles notFound(), but satisfies TypeScript
     if (!request) { return null; }
 
+    // Map messages to include isFromAdmin and format createdAt
+    const formattedMessages = request.messages.map(message => ({
+        ...message,
+        isFromAdmin: message.user?.role === Role.ADMIN,
+        createdAt: message.createdAt.toISOString(), // Format date to ISO string
+    }));
+
     const assignedAdminName = request.assignedTo?.name || request.assignedTo?.email;
 
     return (
@@ -178,7 +185,7 @@ export default async function DesignRequestDetailPage({ params: { id } }: { para
 
                     {/* Messages Component */}
                     <RequestMessages
-                        initialMessages={request.messages}
+                        initialMessages={formattedMessages}
                         designRequestId={request.id}
                         requestUser={request.user}
                         currentUser={session.user}
