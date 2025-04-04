@@ -10,6 +10,7 @@ export const runtime = 'nodejs';
 export async function middleware(request: NextRequest) {
   const token = await getToken({ req: request });
   const isAuthenticated = !!token;
+  const userStatus = token?.subscriptionStatus as string | undefined; // Get status from token
   const isSubscriptionRequiredPath = request.nextUrl.pathname.startsWith('/dashboard/requests');
   // const isNewRequestPage = request.nextUrl.pathname === '/dashboard/requests/new'; // Covered by startsWith
 
@@ -63,47 +64,25 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url);
   }
   
-  // If the user is authenticated and trying to access a subscription-required path
+  // --- NEW Subscription Check Logic --- 
   if (isAuthenticated && isSubscriptionRequiredPath) {
-    console.log(`Middleware: User accessing subscription required path ${path}. Redirecting to check subscription status.`);
-    // Redirect to the API route for checking the subscription. Pass the original URL.
-    const checkSubUrl = new URL('/api/check-subscription', request.url);
-    checkSubUrl.searchParams.set('callbackUrl', request.nextUrl.href); // Pass the original intended URL
-    return NextResponse.redirect(checkSubUrl);
+    // Check status directly from the token
+    const hasActiveSubscription = userStatus === 'active';
 
-    /* --- REMOVED DATABASE LOGIC ---
-    try {
-      // Check subscription status directly from the database
-      const user = await prisma.user.findUnique({
-        where: { email: token.email as string },
-        select: { subscriptionStatus: true } // Only select the needed field
-      });
-
-      const hasActiveSubscription = user?.subscriptionStatus === 'active';
-
-      if (!hasActiveSubscription) {
-        console.log(`Middleware: User ${token.email} has no active subscription, redirecting`);
-        // Redirect any attempt to access subscription-required pages without a sub to billing
-        return NextResponse.redirect(new URL('/dashboard/billing', request.url));
-      }
-
-      console.log(`Middleware: User ${token.email} has active subscription, allowing access to ${path}`);
-      // Allow access if subscription is active
-      return NextResponse.next(); 
-
-    } catch (error) {
-      console.error('Middleware: Error checking subscription status:', error);
-      // Gracefully handle potential DB errors during check. Decide if access should be allowed or denied.
-      // Allowing access might be safer if the DB is temporarily down.
-      // Alternatively, redirect to an error page or billing.
-      // For now, allowing access:
-      return NextResponse.next();
+    if (!hasActiveSubscription) {
+      console.log(`Middleware: User ${token?.email} has status '${userStatus}', redirecting from ${path} to billing.`);
+      // Redirect to billing if subscription is not active
+      url.pathname = '/dashboard/billing';
+      return NextResponse.redirect(url);
+    } else {
+       console.log(`Middleware: User ${token?.email} has active status, allowing access to ${path}.`);
+       // Allow access if subscription is active
+       return NextResponse.next(); 
     }
-    */
   }
   
   // For all other authenticated & non-subscription-required paths, or paths handled above
-  console.log(`Middleware: Allowing request to ${path}`);
+  console.log(`Middleware: Allowing request to ${path} (default rule).`);
   return NextResponse.next();
 }
 
@@ -123,7 +102,7 @@ export const config = {
      * - sw.js (Service Worker)
      */
     // Updated negative lookahead to exclude the new API route
-    '/((?!api/auth|api/check-subscription|_next/static|_next/image|favicon.ico|assets/|manifest.json|sw.js|.*\\..*).*)',
+    '/((?!api/auth|_next/static|_next/image|favicon.ico|assets/|manifest.json|sw.js|.*\\..*).*)',
     
     // Explicitly include paths that still need specific middleware logic 
     // defined within the middleware function above, even if they might be 
