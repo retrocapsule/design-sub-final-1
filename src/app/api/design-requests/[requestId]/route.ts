@@ -26,11 +26,9 @@ export async function GET(request: NextRequest, { params }: Params) {
         // Ensure the user owns the request or is an admin (add role check if needed)
         userId: session.user.id, 
       },
-      // Include related data if necessary, e.g., comments, files
-      // include: {
-      //   files: true,
-      //   comments: true,
-      // }
+      include: {
+        user: true
+      }
     });
 
     if (!designRequest) {
