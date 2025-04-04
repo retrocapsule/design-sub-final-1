@@ -115,21 +115,22 @@ export function CheckoutForm({ packageId }: CheckoutFormProps) {
   };
 
   const cardElementOptions = {
-    style: {
-      base: {
-        color: '#32325d',
-        fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
-        fontSmoothing: 'antialiased',
-        fontSize: '16px',
-        '::placeholder': {
-          color: '#aab7c4'
-        }
-      },
-      invalid: {
-        color: '#fa755a',
-        iconColor: '#fa755a'
-      }
-    },
+    // Temporarily removing custom styles to test default rendering
+    // style: {
+    //   base: {
+    //     color: '#32325d',
+    //     fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+    //     fontSmoothing: 'antialiased',
+    //     fontSize: '16px',
+    //     '::placeholder': {
+    //       color: '#aab7c4'
+    //     }
+    //   },
+    //   invalid: {
+    //     color: '#fa755a',
+    //     iconColor: '#fa755a'
+    //   }
+    // },
     hidePostalCode: true
   };
 
@@ -139,7 +140,7 @@ export function CheckoutForm({ packageId }: CheckoutFormProps) {
         <Label htmlFor="card-element" className="block text-sm font-medium text-gray-700 mb-1">
           Credit or debit card
         </Label>
-        <div className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm border p-3 bg-white h-11 flex items-center">
+        <div className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm border p-3 bg-white">
           <CardElement id="card-element" options={cardElementOptions} />
         </div>
       </div>
