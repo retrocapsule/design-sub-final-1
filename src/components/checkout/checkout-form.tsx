@@ -129,7 +129,7 @@ export function CheckoutForm({ packageId }: CheckoutFormProps) {
         <Label htmlFor="card-element" className="block text-sm font-medium text-gray-700 mb-1">
           Credit or debit card
         </Label>
-        <div className="px-3 py-3.5 border border-gray-300 rounded-md bg-white">
+        <div className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm border p-3 bg-white">
           <CardElement id="card-element" options={cardElementOptions} />
         </div>
       </div>
