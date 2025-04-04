@@ -13,6 +13,9 @@ import { DesignRequest } from '@prisma/client';
 // Import Alert Dialog components if available (using browser confirm for now)
 // import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 
+// Import the messaging component
+import RequestMessages from '@/components/admin/request-messages';
+
 // Define a more complete type locally if needed, ensuring it matches schema
 interface ExtendedDesignRequest extends DesignRequest {
   priority: string;
@@ -143,61 +146,71 @@ export default function RequestDetailPage() {
 
   // --- Main component render: TypeScript now knows request is not null --- 
   return (
-    <div className="space-y-6">
-      <DashboardHeader 
-        title="Request Details" 
-        // Safely access title
-        description={`Viewing details for request: ${request.title}`}
-      >
-        {/* Header is empty of buttons */}
-      </DashboardHeader>
+    <>
+      <div className="space-y-6">
+        <DashboardHeader 
+          title="Request Details" 
+          // Safely access title
+          description={`Viewing details for request: ${request.title}`}
+        >
+          {/* Header is empty of buttons */}
+        </DashboardHeader>
 
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-start">
+        <Card>
+          <CardHeader>
+            <div className="flex justify-between items-start">
+              <div>
+                {/* Safely access title */}
+                <CardTitle className="text-2xl">{request.title}</CardTitle>
+                <CardDescription>Submitted on {formatDate(request.createdAt)}</CardDescription>
+              </div>
+              <div className="flex space-x-2">
+                <Button variant="outline" size="sm" onClick={handleEdit} disabled={deleting}> 
+                    <Edit className="mr-1.5 h-4 w-4" /> Edit
+                </Button>
+                <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleting}>
+                  {deleting ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Trash className="mr-1.5 h-4 w-4" />}
+                  {deleting ? 'Deleting...' : 'Delete'}
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+             <div className="flex items-center space-x-4 pb-4 border-b">
+               {/* Safely access status */}
+               <Badge variant={getStatusBadgeVariant(request.status)} className="capitalize">
+                  Status: {request.status || 'Unknown'}
+               </Badge>
+               {/* Assert type for missing properties - temporary fix */}
+               <Badge variant={(request as any).priority === 'HIGH' ? 'destructive' : 'secondary'} className="capitalize">
+                  Priority: {(request as any).priority || 'N/A'}
+               </Badge>
+            </div>
+            
             <div>
-              {/* Safely access title */}
-              <CardTitle className="text-2xl">{request.title}</CardTitle>
-              <CardDescription>Submitted on {formatDate(request.createdAt)}</CardDescription>
+              <h3 className="font-semibold text-lg mb-2">Description</h3>
+              {/* Safely access description */}
+              <p className="text-muted-foreground whitespace-pre-wrap">{request.description}</p>
             </div>
-            <div className="flex space-x-2">
-              <Button variant="outline" size="sm" onClick={handleEdit} disabled={deleting}> 
-                  <Edit className="mr-1.5 h-4 w-4" /> Edit
-              </Button>
-              <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleting}>
-                {deleting ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Trash className="mr-1.5 h-4 w-4" />}
-                {deleting ? 'Deleting...' : 'Delete'}
-              </Button>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-4 border-t">
+                {/* Assert type for missing properties - temporary fix */}
+                <div><p className="text-sm font-medium text-gray-500">Project Type</p><p className="capitalize">{(request as any).projectType || 'N/A'}</p></div>
+                <div><p className="text-sm font-medium text-gray-500">File Format</p><p>{(request as any).fileFormat?.toUpperCase() || 'N/A'}</p></div>
+                <div><p className="text-sm font-medium text-gray-500">Dimensions</p><p>{(request as any).dimensions || 'N/A'}</p></div>
+                <div><p className="text-sm font-medium text-gray-500">Last Updated</p><p>{formatDate(request.updatedAt)}</p></div>
             </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-           <div className="flex items-center space-x-4 pb-4 border-b">
-             {/* Safely access status */}
-             <Badge variant={getStatusBadgeVariant(request.status)} className="capitalize">
-                Status: {request.status || 'Unknown'}
-             </Badge>
-             {/* Assert type for missing properties - temporary fix */}
-             <Badge variant={(request as any).priority === 'HIGH' ? 'destructive' : 'secondary'} className="capitalize">
-                Priority: {(request as any).priority || 'N/A'}
-             </Badge>
-          </div>
-          
-          <div>
-            <h3 className="font-semibold text-lg mb-2">Description</h3>
-            {/* Safely access description */}
-            <p className="text-muted-foreground whitespace-pre-wrap">{request.description}</p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-4 border-t">
-              {/* Assert type for missing properties - temporary fix */}
-              <div><p className="text-sm font-medium text-gray-500">Project Type</p><p className="capitalize">{(request as any).projectType || 'N/A'}</p></div>
-              <div><p className="text-sm font-medium text-gray-500">File Format</p><p>{(request as any).fileFormat?.toUpperCase() || 'N/A'}</p></div>
-              <div><p className="text-sm font-medium text-gray-500">Dimensions</p><p>{(request as any).dimensions || 'N/A'}</p></div>
-              <div><p className="text-sm font-medium text-gray-500">Last Updated</p><p>{formatDate(request.updatedAt)}</p></div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Add the RequestMessages component after the details card */}
+      {/* Ensure requestId is defined and pass it as a prop */}
+      {requestId && (
+        <div className="mt-8"> {/* Add some margin top */}
+          <RequestMessages requestId={requestId} />
+        </div>
+      )}
+    </>
   );
 }
