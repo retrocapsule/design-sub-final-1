@@ -47,7 +47,8 @@ export const authOptions: NextAuthOptions = {
            console.error(`[Auth] Authorize: User ${credentials.email} found, but database record has no password field.`);
            return null;
         }
-        
+
+        console.log(`[Auth] Authorize: Hash retrieved from DB for ${credentials.email}:`, user.password ? `Exists (Length: ${user.password.length})` : 'DOES NOT EXIST');
         console.log(`[Auth] Authorize: User found for ${credentials.email}. Comparing password.`);
         let isPasswordValid = false;
         try {
