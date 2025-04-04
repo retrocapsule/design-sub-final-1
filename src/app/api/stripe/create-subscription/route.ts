@@ -5,6 +5,7 @@ import { stripe } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
 import type { Stripe } from 'stripe';
 
+// Force Vercel rebuild v2
 export async function POST(request: Request) {
   console.log('[POST /api/stripe/create-subscription] Received request');
   try {
