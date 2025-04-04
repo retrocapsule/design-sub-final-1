@@ -7,72 +7,68 @@ import type { Stripe } from 'stripe';
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 async function activateSubscription(subscriptionId: string, customerId: string) {
-    console.log(`[Webhook: activateSubscription] Activating subscription ${subscriptionId} for customer ${customerId}`);
+    console.error(`>>> activateSubscription START for SubID: ${subscriptionId}, CustID: ${customerId}`);
     try {
-        // Retrieve the full subscription object from Stripe using the ID
-        // This ensures we have the latest details and metadata
+        console.error(`>>> activateSubscription: Attempting stripe.subscriptions.retrieve(${subscriptionId})`);
         const subscription = await stripe.subscriptions.retrieve(subscriptionId);
         if (!subscription) {
-            console.error(`[Webhook: activateSubscription] Could not retrieve subscription ${subscriptionId} from Stripe.`);
+            console.error(`>>> activateSubscription: FAILED stripe.subscriptions.retrieve(${subscriptionId}) - Subscription not found.`);
             return; // Exit if subscription not found
         }
+        console.error(`>>> activateSubscription: Retrieved Subscription ${subscription.id}, Status: ${subscription.status}`);
 
         const userId = subscription.metadata?.userId;
         const planId = subscription.metadata?.planId; // Assuming you store planId here
         const priceId = subscription.items.data[0]?.price?.id;
 
         if (!userId) {
-            console.error(`[Webhook: activateSubscription] Missing userId in metadata for subscription ${subscriptionId}`);
+            console.error(`>>> activateSubscription: FAILED - Missing userId in metadata for subscription ${subscriptionId}`);
             return; // Cannot proceed without userId
         }
-        if (!planId || !priceId) {
-             console.error(`[Webhook: activateSubscription] Missing planId or priceId in metadata/items for subscription ${subscriptionId}`);
-             // Decide if you still want to activate partially
-             // return;
-        }
+         console.error(`>>> activateSubscription: Found userId in metadata: ${userId}`);
+        // Add checks/logging for planId/priceId if needed...
 
-        console.log(`[Webhook: activateSubscription] Retrieved Subscription ${subscription.id}, Status: ${subscription.status}. Metadata: userId=${userId}, planId=${planId}. PriceId: ${priceId}`);
-
-        // Find the corresponding package in your DB using the planId from metadata OR priceId
-        // Using planId from metadata might be safer if price IDs can change
+        // Find the corresponding package in your DB
+        console.error(`>>> activateSubscription: Attempting prisma.package.findUnique for planId: ${planId}`);
         const packageData = await prisma.package.findUnique({ where: { id: planId } });
-        // Fallback or primary lookup using priceId if needed:
-        // const packageData = await prisma.package.findUnique({ where: { stripePriceId: priceId } });
 
         if (!packageData) {
-            console.error(`[Webhook: activateSubscription] Could not find Package in DB corresponding to planId: ${planId} (or priceId: ${priceId})`);
+            console.error(`>>> activateSubscription: FAILED - Could not find Package in DB corresponding to planId: ${planId}`);
             return; // Cannot proceed without matching package
         }
-        console.log(`[Webhook: activateSubscription] Found matching Package: ${packageData.name} (ID: ${packageData.id})`);
+        console.error(`>>> activateSubscription: Found matching Package: ${packageData.name} (ID: ${packageData.id})`);
 
         // --- Enhanced User Update --- 
-        console.log(`[Webhook: activateSubscription] Attempting to update User record with ID: ${userId}`);
+        console.error(`>>> activateSubscription: PRE-UPDATE User record for ID: ${userId}`);
         try {
             const updatedUser = await prisma.user.update({
                 where: { id: userId },
                 data: {
-                    subscriptionStatus: 'active', // Use 'active' or map from subscription.status
-                    subscriptionId: subscription.id, // Store Stripe subscription ID on user
-                    stripeCustomerId: customerId, // Ensure customer ID is stored/updated
+                    subscriptionStatus: 'active', // Explicitly setting to active
+                    subscriptionId: subscription.id,
+                    stripeCustomerId: customerId,
                 },
             });
-            console.log(`[Webhook: activateSubscription] Successfully updated User record for ID: ${userId}. Status set to: ${updatedUser.subscriptionStatus}`);
+            // Log the actual status returned after the update
+            console.error(`>>> activateSubscription: POST-UPDATE User successful for ID: ${userId}. Returned Status: ${updatedUser?.subscriptionStatus}`);
         } catch (userUpdateError) {
-            console.error(`[Webhook: activateSubscription] FAILED to update User record for ID: ${userId}. Error:`, userUpdateError);
+            console.error(`>>> activateSubscription: FAILED during prisma.user.update for ID: ${userId}. Error:`, userUpdateError);
+            // Continue to upsert subscription even if user update failed? Maybe not.
+            return; // Exit if user update fails, as access relies on it.
         }
 
         // --- Subscription Upsert --- 
-        console.log(`[Webhook: activateSubscription] Attempting to upsert Subscription record for user ID: ${userId}`);
+         console.error(`>>> activateSubscription: PRE-UPSERT Subscription record for user ID: ${userId}`);
         await prisma.subscription.upsert({
              where: { userId: userId },
              update: {
                 packageId: packageData.id,
-                status: subscription.status, // Use status from retrieved subscription
+                status: subscription.status,
                 stripeSubscriptionId: subscription.id,
-                stripePriceId: priceId, // Store the actual price ID
+                stripePriceId: priceId,
              },
              create: {
-                id: subscription.id, // Use stripe subscription id as primary key maybe?
+                // id: subscription.id, // Prisma typically auto-generates IDs unless specified otherwise
                 userId: userId,
                 packageId: packageData.id,
                 status: subscription.status,
@@ -80,11 +76,12 @@ async function activateSubscription(subscriptionId: string, customerId: string) 
                 stripePriceId: priceId,
              },
          });
-        console.log(`[Webhook: activateSubscription] Successfully upserted Subscription record for user ID: ${userId}`);
+        console.error(`>>> activateSubscription: POST-UPSERT Subscription successful for user ID: ${userId}`);
 
     } catch (error) {
-        console.error(`[Webhook: activateSubscription] Error during activation process for subscription ${subscriptionId}:`, error);
+        console.error(`>>> activateSubscription: FAILED - Outer catch block error for SubID ${subscriptionId}:`, error);
     }
+    console.error(`>>> activateSubscription END for SubID: ${subscriptionId}`);
 }
 
 async function deactivateSubscription(subscription: Stripe.Subscription) {
