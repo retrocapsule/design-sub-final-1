@@ -7,6 +7,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Add Role enum
+enum Role {
+  USER
+  ADMIN
+}
+
 model User {
   id                   String          @id @default(cuid())
   name                 String?
@@ -14,7 +20,7 @@ model User {
   emailVerified        DateTime?
   image                String?
   password             String?
-  role                 String          @default("USER")
+  role                 Role            @default(USER)
   onboardingStep       String?         @default("profile")
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
