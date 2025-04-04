@@ -11,6 +11,13 @@ export async function middleware(request: NextRequest) {
   const token = await getToken({ req: request });
   const isAuthenticated = !!token;
   const userStatus = token?.subscriptionStatus as string | undefined; // Get status from token
+
+  // *** ADD LOGGING HERE ***
+  if (isAuthenticated) {
+    console.log(`Middleware Check: User ${token?.email}, Token Status: '${userStatus}'`);
+  }
+  // *************************
+
   const isSubscriptionRequiredPath = request.nextUrl.pathname.startsWith('/dashboard/requests');
   // const isNewRequestPage = request.nextUrl.pathname === '/dashboard/requests/new'; // Covered by startsWith
 
@@ -66,7 +73,8 @@ export async function middleware(request: NextRequest) {
   
   // --- NEW Subscription Check Logic --- 
   if (isAuthenticated && isSubscriptionRequiredPath) {
-    // Check status directly from the token
+    // Add log specific to this check
+    console.log(`Middleware: Checking subscription for ${path}. User Status from Token: '${userStatus}'`);
     const hasActiveSubscription = userStatus === 'active';
 
     if (!hasActiveSubscription) {
