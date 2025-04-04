@@ -42,18 +42,26 @@ async function activateSubscription(subscriptionId: string, customerId: string) 
             throw new Error(`Package not found for ID: ${planId}`);
         }
 
-        // Update user status
-        await prisma.user.update({
-            where: { id: userId },
-            data: {
-                subscriptionStatus: 'active',
-                subscriptionId: subscription.id, // Store Stripe subscription ID on user
-                stripeCustomerId: customerId, // Ensure customer ID is stored/updated
-            },
-        });
-        console.log(`[Webhook: activateSubscription] Updated user ${userId} status to active.`);
+        // --- Enhanced User Update --- 
+        console.log(`[Webhook: activateSubscription] Attempting to update User record with ID: ${userId}`);
+        try {
+            const updatedUser = await prisma.user.update({
+                where: { id: userId },
+                data: {
+                    subscriptionStatus: 'active',
+                    subscriptionId: subscription.id, // Store Stripe subscription ID on user
+                    stripeCustomerId: customerId, // Ensure customer ID is stored/updated
+                },
+            });
+            console.log(`[Webhook: activateSubscription] Successfully updated User record for ID: ${userId}. Status set to: ${updatedUser.subscriptionStatus}`);
+        } catch (userUpdateError) {
+            console.error(`[Webhook: activateSubscription] FAILED to update User record for ID: ${userId}. Error:`, userUpdateError);
+            // Decide if this should prevent the subscription upsert or just be logged.
+            // For now, we'll log and continue, but this indicates a potential data mismatch.
+        }
 
-        // Create or update subscription record in DB
+        // --- Subscription Upsert --- 
+        console.log(`[Webhook: activateSubscription] Attempting to upsert Subscription record for user ID: ${userId}`);
         await prisma.subscription.upsert({
             where: { userId: userId }, // Assuming one active subscription per user
             create: {
@@ -73,7 +81,7 @@ async function activateSubscription(subscriptionId: string, customerId: string) 
                 // currentPeriodEnd: new Date(subscription.current_period_end * 1000),
             },
         });
-        console.log(`[Webhook: activateSubscription] Upserted subscription record for user ${userId}`);
+        console.log(`[Webhook: activateSubscription] Successfully upserted Subscription record for user ID: ${userId}`);
 
     } catch (error) {
         console.error(`[Webhook: activateSubscription] Error during activation for ${subscriptionId}:`, error);
