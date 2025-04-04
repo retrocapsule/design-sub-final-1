@@ -2,11 +2,8 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { stripe } from '@/lib/stripe';
-import { STRIPE_PRICE_IDS } from '@/lib/stripe'; // Assuming you map Plan Names/Keys to Price IDs here
 import { prisma } from '@/lib/prisma';
 import type { Stripe } from 'stripe';
-
-type PlanType = keyof typeof STRIPE_PRICE_IDS; // e.g., 'BASIC' | 'PRO' | 'ENTERPRISE'
 
 export async function POST(request: Request) {
   console.log('[POST /api/stripe/create-subscription] Received request');
@@ -40,7 +37,8 @@ export async function POST(request: Request) {
 
     // 2. Fetch package details from DB using planId
     const selectedPackage = await prisma.package.findUnique({
-        where: { id: planId }
+        where: { id: planId },
+        select: { id: true, name: true, stripePriceId: true } // Select only needed fields
     });
 
     if (!selectedPackage) {
@@ -49,16 +47,15 @@ export async function POST(request: Request) {
     }
     console.log(`[POST /api/stripe/create-subscription] Found package: ${selectedPackage.name} (ID: ${selectedPackage.id})`);
 
-    // 3. Get the corresponding Stripe Price ID (Requires mapping in STRIPE_PRICE_IDS)
-    // **IMPORTANT**: Ensure STRIPE_PRICE_IDS keys match the package names or a derivable key
-    const planKey = selectedPackage.name.toUpperCase() as PlanType; // Assuming plan names like 'Basic', 'Pro' map to keys 'BASIC', 'PRO'
-    const priceId = STRIPE_PRICE_IDS[planKey];
+    // 3. Get the Stripe Price ID DIRECTLY from the package record
+    const priceId = selectedPackage.stripePriceId;
 
     if (!priceId) {
-        console.error(`[POST /api/stripe/create-subscription] Stripe Price ID not found for Plan Key: ${planKey} (derived from Package Name: ${selectedPackage.name}). Check STRIPE_PRICE_IDS configuration.`);
-        return NextResponse.json({ error: 'Configuration error: Price ID missing for selected plan.' }, { status: 500 });
+        // This now means the Price ID wasn't set in the database for this package
+        console.error(`[POST /api/stripe/create-subscription] Stripe Price ID missing for Package ID: ${selectedPackage.id} (Name: ${selectedPackage.name}) in the database.`);
+        return NextResponse.json({ error: 'Configuration error: Price ID missing for selected plan in database.' }, { status: 500 });
     }
-    console.log(`[POST /api/stripe/create-subscription] Using Stripe Price ID: ${priceId} for Plan Key: ${planKey}`);
+    console.log(`[POST /api/stripe/create-subscription] Using Stripe Price ID from DB: ${priceId}`);
 
     // 4. Find or Create Stripe Customer
     let stripeCustomerId = user.stripeCustomerId;
@@ -67,15 +64,13 @@ export async function POST(request: Request) {
       try {
         const customer = await stripe.customers.create({
           email: user.email,
-          name: user.name || undefined, // Optional: pass user's name
+          name: user.name || undefined, 
           metadata: {
             userId: user.id,
           },
         });
         stripeCustomerId = customer.id;
         console.log(`[POST /api/stripe/create-subscription] Created Stripe Customer: ${stripeCustomerId}`);
-
-        // Update user record in DB with the new Stripe Customer ID
         await prisma.user.update({
           where: { id: user.id },
           data: { stripeCustomerId: stripeCustomerId },
@@ -89,17 +84,17 @@ export async function POST(request: Request) {
       console.log(`[POST /api/stripe/create-subscription] Found existing Stripe Customer ID: ${stripeCustomerId} for user ${user.id}.`);
     }
 
-    // 5. Create the Stripe Subscription
+    // 5. Create the Stripe Subscription using the priceId from the DB
     console.log(`[POST /api/stripe/create-subscription] Creating Stripe Subscription for Customer ${stripeCustomerId} with Price ${priceId}`);
     let subscription: Stripe.Subscription;
     try {
          subscription = await stripe.subscriptions.create({
             customer: stripeCustomerId,
-            items: [{ price: priceId }],
-            payment_behavior: 'default_incomplete', // Crucial: Creates subscription but requires payment confirmation
-            payment_settings: { save_default_payment_method: 'on_subscription' }, // Save card for future renewals
-            expand: ['latest_invoice.payment_intent'], // Expand to get the Payment Intent for the initial invoice
-            metadata: { // Optional: Add metadata for easier tracking
+            items: [{ price: priceId }], // Uses priceId fetched from DB
+            payment_behavior: 'default_incomplete', 
+            payment_settings: { save_default_payment_method: 'on_subscription' }, 
+            expand: ['latest_invoice.payment_intent'], 
+            metadata: { 
                 userId: user.id,
                 planId: selectedPackage.id,
                 planName: selectedPackage.name
@@ -109,10 +104,12 @@ export async function POST(request: Request) {
 
     } catch (subError: any) {
         console.error('[POST /api/stripe/create-subscription] Error creating Stripe subscription:', subError);
+        // Log the priceId used for debugging
+        console.error(`[POST /api/stripe/create-subscription] Price ID used in failed attempt: ${priceId}`); 
         return NextResponse.json({ error: 'Failed to create subscription.', details: subError.message }, { status: 500 });
     }
 
-    // 6. Extract the client secret from the Payment Intent associated with the subscription's first invoice
+    // 6. Extract the client secret 
     const latestInvoice = subscription.latest_invoice as Stripe.Invoice;
     const paymentIntent = latestInvoice.payment_intent as Stripe.PaymentIntent;
 
@@ -123,7 +120,7 @@ export async function POST(request: Request) {
 
     console.log(`[POST /api/stripe/create-subscription] Successfully created subscription ${subscription.id} and retrieved client_secret.`);
 
-    // 7. Return the client secret and subscription ID to the frontend
+    // 7. Return the client secret and subscription ID
     return NextResponse.json({
       clientSecret: paymentIntent.client_secret,
       subscriptionId: subscription.id,
