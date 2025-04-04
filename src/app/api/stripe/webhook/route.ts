@@ -83,7 +83,7 @@ async function activateSubscription(subscriptionId: string, customerId: string) 
 }
 
 export async function POST(request: Request) {
-  console.log('[Webhook: POST] Received request');
+  console.log('[Webhook: POST - DEBUG] Received request');
   let event: Stripe.Event;
 
   try {
@@ -92,26 +92,31 @@ export async function POST(request: Request) {
     const signature = headersList.get('stripe-signature');
 
     if (!signature || !webhookSecret) {
-      console.error('[Webhook: POST] Missing Stripe signature or webhook secret.');
+      console.error('[Webhook: POST - DEBUG] Missing Stripe signature or webhook secret.');
       return NextResponse.json(
         { error: 'Webhook configuration error.' },
-        { status: 400 }
+        { status: 400 } // Keep 400 for config errors
       );
     }
+    console.log('[Webhook: POST - DEBUG] Found signature and secret. Constructing event...');
 
     event = stripe.webhooks.constructEvent(
       body,
       signature,
       webhookSecret
     );
-    console.log(`[Webhook: POST] Event constructed successfully: ${event.type} (${event.id})`);
+    console.log(`[Webhook: POST - DEBUG] Event constructed successfully: ${event.type} (${event.id})`);
 
   } catch (err: any) {
-    console.error('[Webhook: POST] Error constructing webhook event:', err.message);
+    console.error('[Webhook: POST - DEBUG] Error constructing webhook event:', err.message);
     return NextResponse.json({ error: `Webhook Error: ${err.message}` }, { status: 400 });
   }
 
-  // --- Handle Specific Events --- 
+  // --- TEMPORARILY BYPASS EVENT PROCESSING --- 
+  console.log(`[Webhook: POST - DEBUG] Bypassing detailed processing for event type: ${event.type}. Returning 200 OK.`);
+  return NextResponse.json({ received: true }, { status: 200 });
+
+  /* // --- Original Handling Logic (Commented Out) --- 
   try {
     switch (event.type) {
       // ** Handle payment success for the FIRST invoice of a new subscription (Elements flow) **
@@ -269,4 +274,5 @@ export async function POST(request: Request) {
        { status: 500 } // Use 500 for server-side processing errors
      );
   }
+  */
 } 
