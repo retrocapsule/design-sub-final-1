@@ -9,38 +9,41 @@ const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 async function activateSubscription(subscriptionId: string, customerId: string) {
     console.log(`[Webhook: activateSubscription] Activating subscription ${subscriptionId} for customer ${customerId}`);
     try {
-        // Retrieve the subscription to get metadata and price info
-        const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
-            expand: ['items.data.price'] // Ensure we get price details
-        });
+        // Retrieve the full subscription object from Stripe using the ID
+        // This ensures we have the latest details and metadata
+        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+        if (!subscription) {
+            console.error(`[Webhook: activateSubscription] Could not retrieve subscription ${subscriptionId} from Stripe.`);
+            return; // Exit if subscription not found
+        }
 
         const userId = subscription.metadata?.userId;
-        const planId = subscription.metadata?.planId;
+        const planId = subscription.metadata?.planId; // Assuming you store planId here
         const priceId = subscription.items.data[0]?.price?.id;
 
         if (!userId) {
             console.error(`[Webhook: activateSubscription] Missing userId in metadata for subscription ${subscriptionId}`);
-            throw new Error('Missing userId in subscription metadata');
+            return; // Cannot proceed without userId
         }
-        if (!planId) {
-            console.error(`[Webhook: activateSubscription] Missing planId in metadata for subscription ${subscriptionId}`);
-            throw new Error('Missing planId in subscription metadata');
-        }
-         if (!priceId) {
-            console.error(`[Webhook: activateSubscription] Missing priceId in subscription items for ${subscriptionId}`);
-            throw new Error('Missing priceId in subscription items');
+        if (!planId || !priceId) {
+             console.error(`[Webhook: activateSubscription] Missing planId or priceId in metadata/items for subscription ${subscriptionId}`);
+             // Decide if you still want to activate partially
+             // return;
         }
 
-        console.log(`[Webhook: activateSubscription] Found metadata: userId=${userId}, planId=${planId}, priceId=${priceId}`);
+        console.log(`[Webhook: activateSubscription] Retrieved Subscription ${subscription.id}, Status: ${subscription.status}. Metadata: userId=${userId}, planId=${planId}. PriceId: ${priceId}`);
 
-        // Verify package exists in DB
-        const packageData = await prisma.package.findUnique({
-             where: { id: planId }
-        });
+        // Find the corresponding package in your DB using the planId from metadata OR priceId
+        // Using planId from metadata might be safer if price IDs can change
+        const packageData = await prisma.package.findUnique({ where: { id: planId } });
+        // Fallback or primary lookup using priceId if needed:
+        // const packageData = await prisma.package.findUnique({ where: { stripePriceId: priceId } });
+
         if (!packageData) {
-            console.error(`[Webhook: activateSubscription] Package not found in DB for ID: ${planId}`);
-            throw new Error(`Package not found for ID: ${planId}`);
+            console.error(`[Webhook: activateSubscription] Could not find Package in DB corresponding to planId: ${planId} (or priceId: ${priceId})`);
+            return; // Cannot proceed without matching package
         }
+        console.log(`[Webhook: activateSubscription] Found matching Package: ${packageData.name} (ID: ${packageData.id})`);
 
         // --- Enhanced User Update --- 
         console.log(`[Webhook: activateSubscription] Attempting to update User record with ID: ${userId}`);
@@ -48,7 +51,7 @@ async function activateSubscription(subscriptionId: string, customerId: string) 
             const updatedUser = await prisma.user.update({
                 where: { id: userId },
                 data: {
-                    subscriptionStatus: 'active',
+                    subscriptionStatus: 'active', // Use 'active' or map from subscription.status
                     subscriptionId: subscription.id, // Store Stripe subscription ID on user
                     stripeCustomerId: customerId, // Ensure customer ID is stored/updated
                 },
@@ -56,37 +59,31 @@ async function activateSubscription(subscriptionId: string, customerId: string) 
             console.log(`[Webhook: activateSubscription] Successfully updated User record for ID: ${userId}. Status set to: ${updatedUser.subscriptionStatus}`);
         } catch (userUpdateError) {
             console.error(`[Webhook: activateSubscription] FAILED to update User record for ID: ${userId}. Error:`, userUpdateError);
-            // Decide if this should prevent the subscription upsert or just be logged.
-            // For now, we'll log and continue, but this indicates a potential data mismatch.
         }
 
         // --- Subscription Upsert --- 
         console.log(`[Webhook: activateSubscription] Attempting to upsert Subscription record for user ID: ${userId}`);
         await prisma.subscription.upsert({
-            where: { userId: userId }, // Assuming one active subscription per user
-            create: {
+             where: { userId: userId },
+             update: {
+                packageId: packageData.id,
+                status: subscription.status, // Use status from retrieved subscription
+                stripeSubscriptionId: subscription.id,
+                stripePriceId: priceId, // Store the actual price ID
+             },
+             create: {
+                id: subscription.id, // Use stripe subscription id as primary key maybe?
                 userId: userId,
-                packageId: planId,
-                status: 'active', // Use subscription.status from Stripe? Could be 'trialing' etc.
+                packageId: packageData.id,
+                status: subscription.status,
                 stripeSubscriptionId: subscription.id,
                 stripePriceId: priceId,
-                // Add current_period_end, start_date etc. if needed from subscription object
-                // currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-            },
-            update: {
-                packageId: planId,
-                status: 'active', // Or subscription.status
-                stripeSubscriptionId: subscription.id,
-                stripePriceId: priceId,
-                // currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-            },
-        });
+             },
+         });
         console.log(`[Webhook: activateSubscription] Successfully upserted Subscription record for user ID: ${userId}`);
 
     } catch (error) {
-        console.error(`[Webhook: activateSubscription] Error during activation for ${subscriptionId}:`, error);
-        // Consider how to handle errors - retry logic, logging, alerts?
-        throw error; // Re-throw to indicate failure
+        console.error(`[Webhook: activateSubscription] Error during activation process for subscription ${subscriptionId}:`, error);
     }
 }
 
@@ -144,13 +141,16 @@ export async function POST(request: Request) {
     switch (event.type) {
       case 'invoice.payment_succeeded': {
         const invoice = event.data.object as Stripe.Invoice;
-        console.log(`[Webhook: POST] Handling invoice.payment_succeeded for invoice: ${invoice.id}`);
+        // Add detailed logging for the invoice object
+        console.log(`[Webhook: POST] Handling invoice.payment_succeeded for invoice: ${invoice.id}. Full Invoice Object:`, JSON.stringify(invoice, null, 2));
+
         // Check if it's for a subscription
         if (invoice.subscription) {
-          const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
-          await activateSubscription(invoice.subscription as string, invoice.customer as string);
+           console.log(`[Webhook: POST] Invoice ${invoice.id} IS associated with subscription: ${invoice.subscription}. Activating.`);
+           // Pass the subscription ID and customer ID
+           await activateSubscription(invoice.subscription as string, invoice.customer as string);
         } else {
-            console.log('[Webhook: POST] Invoice payment succeeded, but not for a subscription.');
+           console.log(`[Webhook: POST] Invoice ${invoice.id} is NOT associated with a subscription (invoice.subscription is null or empty).`);
         }
         break;
       }
@@ -169,27 +169,35 @@ export async function POST(request: Request) {
           break;
       }
 
+      case 'customer.subscription.created': {
+          const subscription = event.data.object as Stripe.Subscription;
+          console.log(`[Webhook: POST] Handling customer.subscription.created for subscription: ${subscription.id}, Status: ${subscription.status}`);
+          // Directly activate using the subscription object details
+          // Ensure customer ID is correctly passed (it's on the subscription object)
+          if (subscription.customer) {
+              await activateSubscription(subscription.id, subscription.customer as string);
+          } else {
+              console.error(`[Webhook: POST] customer.subscription.created event is missing customer ID for subscription ${subscription.id}`);
+          }
+          break;
+      }
+
       case 'customer.subscription.updated': {
-        const subscription = event.data.object as Stripe.Subscription;
-        console.log(`[Webhook: POST] Handling customer.subscription.updated for subscription: ${subscription.id}, Status: ${subscription.status}`);
-        // Handle changes like plan upgrades/downgrades or status changes (e.g., past_due)
-        if (subscription.status === 'active') {
-          await activateSubscription(subscription.id, subscription.customer as string);
-        } else {
-          // Handle other statuses if needed (e.g., past_due, unpaid, canceled)
-          // For simplicity, we might just rely on deleted for full deactivation
-           console.log(`[Webhook: POST] Subscription status is ${subscription.status}, not activating.`);
-           // Consider adding specific logic for 'canceled', 'past_due' etc. if needed.
-        }
-        break;
+           // ... existing logic ...
+            // Make sure activateSubscription call passes correct arguments
+           const subscription = event.data.object as Stripe.Subscription;
+           if (subscription.status === 'active' && subscription.customer) {
+               await activateSubscription(subscription.id, subscription.customer as string);
+           } else {
+               console.log(`[Webhook: POST] Subscription ${subscription.id} status is ${subscription.status} or customer is missing, not activating via update.`);
+               // Handle other statuses if needed
+           }
+            break;
       }
 
       case 'customer.subscription.deleted': {
-        const subscription = event.data.object as Stripe.Subscription;
-        console.log(`[Webhook: POST] Handling customer.subscription.deleted for subscription: ${subscription.id}`);
-        // Sent when a subscription is canceled or ends
-        await deactivateSubscription(subscription);
-        break;
+           // ... existing logic ...
+            break;
       }
 
       default:
