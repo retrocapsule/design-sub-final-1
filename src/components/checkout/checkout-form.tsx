@@ -1,17 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Loader2, AlertTriangle, ArrowRight, LockIcon } from 'lucide-react';
-
-// Ensure NEXT_PUBLIC_STRIPE_PUBLIC_KEY is set in your .env.local
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY || '');
 
 interface CheckoutFormProps {
   packageId: string | null;
@@ -24,6 +20,11 @@ export function CheckoutForm({ packageId }: CheckoutFormProps) {
   const { data: session } = useSession();
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    console.log("[CheckoutForm] Stripe instance:", stripe);
+    console.log("[CheckoutForm] Elements instance:", elements);
+  }, [stripe, elements]);
 
   if (!packageId) {
     return (
@@ -46,17 +47,21 @@ export function CheckoutForm({ packageId }: CheckoutFormProps) {
     setError(null);
 
     if (!stripe || !elements) {
-      setError("Stripe.js has not loaded yet. Please wait a moment and try again.");
+      console.error("[CheckoutForm Submit] Stripe or Elements not loaded.");
+      setError("Payment system not ready. Please wait a moment and try again.");
       setProcessing(false);
       return;
     }
 
     const cardElement = elements.getElement(CardElement);
     if (!cardElement) {
+      console.error("[CheckoutForm Submit] CardElement not found.");
       setError("Card details component not found. Please refresh the page.");
       setProcessing(false);
       return;
     }
+    
+    console.log("[CheckoutForm Submit] Attempting payment confirmation...");
 
     try {
       // 1. Call backend to create subscription and get client secret
@@ -71,10 +76,12 @@ export function CheckoutForm({ packageId }: CheckoutFormProps) {
       const subData = await createSubResponse.json();
 
       if (!createSubResponse.ok || !subData.clientSecret) {
+        console.error("[CheckoutForm Submit] Failed to create subscription or get client secret.", subData);
         throw new Error(subData.error || 'Failed to initialize payment.');
       }
 
       const { clientSecret, subscriptionId } = subData;
+      console.log("[CheckoutForm Submit] Got client secret, confirming card payment.");
 
       // 2. Confirm the card payment with the client secret
       const paymentResult = await stripe.confirmCardPayment(clientSecret, {
@@ -88,15 +95,18 @@ export function CheckoutForm({ packageId }: CheckoutFormProps) {
       });
 
       if (paymentResult.error) {
+        console.error("[CheckoutForm Submit] Payment confirmation error:", paymentResult.error);
         setError(paymentResult.error.message || 'An unexpected payment error occurred.');
         toast.error(paymentResult.error.message || 'Payment failed.');
         setProcessing(false);
       } else {
+        console.log("[CheckoutForm Submit] Payment successful!");
         toast.success('Payment successful! Your subscription is being activated.');
+        cardElement.clear();
         router.push('/onboarding');
       }
     } catch (err: any) {
-      console.error('Subscription/Payment error:', err);
+      console.error('[CheckoutForm Submit] Subscription/Payment error:', err);
       const message = err.message || 'An unexpected error occurred.';
       setError(message);
       toast.error(message);
@@ -129,7 +139,7 @@ export function CheckoutForm({ packageId }: CheckoutFormProps) {
         <Label htmlFor="card-element" className="block text-sm font-medium text-gray-700 mb-1">
           Credit or debit card
         </Label>
-        <div className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm border p-3 bg-white">
+        <div className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm border p-3 bg-white h-11 flex items-center">
           <CardElement id="card-element" options={cardElementOptions} />
         </div>
       </div>
@@ -141,7 +151,7 @@ export function CheckoutForm({ packageId }: CheckoutFormProps) {
       <Button
         type="submit"
         className="w-full"
-        disabled={!stripe || processing}
+        disabled={!stripe || !elements || processing}
       >
         {processing ? (
           <>
