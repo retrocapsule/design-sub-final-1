@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
+import Link from 'next/link';
 
 function SignInContent() {
   const searchParams = useSearchParams();
@@ -88,6 +89,12 @@ function SignInContent() {
             )}
           </Button>
         </form>
+        <p className="mt-8 text-center text-sm text-gray-600">
+          Don\'t have an account?{\' \'}
+          <Link href="/signup" className="font-medium text-indigo-600 hover:text-indigo-500">
+            Sign up
+          </Link>
+        </p>
       </div>
     </div>
   );

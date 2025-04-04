@@ -10,6 +10,8 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { Navigation } from '@/components/layout/navigation';
+import { Footer } from '@/components/layout/footer';
 
 function SignUpContent() {
   const router = useRouter();
@@ -167,8 +169,14 @@ function SignUpContent() {
 
 export default function SignUpPage() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <SignUpContent />
-    </Suspense>
+    <div className="flex flex-col min-h-screen">
+      <Navigation />
+      <main className="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <Suspense fallback={<Loader2 className="h-8 w-8 animate-spin" />}>
+          <SignUpContent />
+        </Suspense>
+      </main>
+      <Footer />
+    </div>
   );
 } 
