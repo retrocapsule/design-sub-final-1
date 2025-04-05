@@ -4,10 +4,14 @@ BEGIN
     -- Output diagnostic information
     RAISE NOTICE 'Starting Role enum fix...';
     
-    -- Check if Role type exists
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'role') THEN
-        RAISE NOTICE 'Role enum does not exist, creating it...';
-        CREATE TYPE "Role" AS ENUM ('USER', 'ADMIN');
+    -- Check if Role type exists with proper case sensitivity
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'Role') THEN
+        BEGIN
+            RAISE NOTICE 'Role enum does not exist, creating it...';
+            CREATE TYPE "Role" AS ENUM ('USER', 'ADMIN');
+        EXCEPTION WHEN duplicate_object THEN
+            RAISE NOTICE 'Role enum already exists (caught in exception handler)';
+        END;
     ELSE
         RAISE NOTICE 'Role enum already exists';
     END IF;
@@ -21,8 +25,13 @@ BEGIN
     END;
     
     -- Create a temporary domain to help with the conversion
-    CREATE DOMAIN "Role_domain" AS TEXT
-        CONSTRAINT role_values CHECK (VALUE IN ('USER', 'ADMIN'));
+    BEGIN
+        CREATE DOMAIN "Role_domain" AS TEXT
+            CONSTRAINT role_values CHECK (VALUE IN ('USER', 'ADMIN'));
+        RAISE NOTICE 'Created Role_domain';
+    EXCEPTION WHEN duplicate_object THEN
+        RAISE NOTICE 'Role_domain already exists';
+    END;
     
     -- Check the current role column type
     RAISE NOTICE 'Checking current column type in User table...';
@@ -64,8 +73,12 @@ BEGIN
     END;
     
     -- Drop the temporary domain
-    DROP DOMAIN "Role_domain";
-    RAISE NOTICE 'Dropped temporary Role_domain';
+    BEGIN
+        DROP DOMAIN IF EXISTS "Role_domain";
+        RAISE NOTICE 'Dropped temporary Role_domain';
+    EXCEPTION WHEN OTHERS THEN
+        RAISE NOTICE 'Error dropping domain: %', SQLERRM;
+    END;
     
     -- Create an index on role if it doesn't exist
     IF NOT EXISTS (
