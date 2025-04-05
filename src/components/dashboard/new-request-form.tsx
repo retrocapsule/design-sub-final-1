@@ -188,15 +188,15 @@ export function NewRequestForm() {
                         }}
                         content={{
                             button({ ready, isUploading }) {
-                              if (ready) return <div>Upload Files</div>;
-                              if (isUploading) return <div>Uploading...</div>
-                              return "Getting ready...";
+                              if (ready) return <div className="text-white">Upload Files</div>;
+                              if (isUploading) return <div className="text-white">Uploading...</div>
+                              return <div className="text-white">Getting ready...</div>;
                             },
                             allowedContent({ ready, fileTypes, isUploading }) {
-                              return `Images/PDFs up to 4MB/16MB (${uploadedFiles.length} uploaded)`;
+                              return <div className="text-slate-300">Images/PDFs up to 4MB/16MB ({uploadedFiles.length} uploaded)</div>;
                             },
                           }}
-                          className="ut-button:bg-primary ut-button:text-primary-foreground ut-button:ut-readying:bg-primary/80"
+                          className="ut-button:bg-primary ut-button:text-white ut-button:ut-readying:bg-primary/80 ut-allowed-content:text-slate-300"
                     />
                 </FormControl>
                 <FormDescription>
