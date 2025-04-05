@@ -186,17 +186,21 @@ export function NewRequestForm() {
                         onUploadError={(error: Error) => {
                             toast.error(`Upload Failed: ${error.message}`);
                         }}
+                        appearance={{
+                            button: "bg-primary text-white hover:bg-primary/90 px-6 py-2 rounded-md font-medium",
+                            container: "w-full border-2 border-dashed border-slate-300 rounded-md p-4 bg-slate-50",
+                            allowedContent: "text-slate-700 font-medium text-sm mt-2"
+                        }}
                         content={{
                             button({ ready, isUploading }) {
-                              if (ready) return <div className="text-white">Upload Files</div>;
-                              if (isUploading) return <div className="text-white">Uploading...</div>
-                              return <div className="text-white">Getting ready...</div>;
+                              if (ready) return <div>Upload Files</div>;
+                              if (isUploading) return <div>Uploading...</div>
+                              return <div>Getting ready...</div>;
                             },
                             allowedContent({ ready, fileTypes, isUploading }) {
-                              return <div className="text-slate-300">Images/PDFs up to 4MB/16MB ({uploadedFiles.length} uploaded)</div>;
+                              return <div>Images/PDFs up to 4MB/16MB ({uploadedFiles.length} uploaded)</div>;
                             },
-                          }}
-                          className="ut-button:bg-primary ut-button:text-white ut-button:ut-readying:bg-primary/80 ut-allowed-content:text-slate-300"
+                        }}
                     />
                 </FormControl>
                 <FormDescription>
