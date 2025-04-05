@@ -194,7 +194,7 @@ export function NewRequestForm() {
                         config={{
                             mode: "manual",
                             appendOnPreflight: true,
-                            uploadUrl: "https://eu.ingest.uploadthing.com"
+                            uploadUrl: "https://us.ingest.uploadthing.com"
                         }}
                         appearance={{
                             button: "bg-primary text-white hover:bg-primary/90 px-6 py-2 rounded-md font-medium",
