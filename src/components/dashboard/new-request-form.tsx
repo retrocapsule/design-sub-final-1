@@ -28,7 +28,8 @@ import type { OurFileRouter } from "@/app/api/uploadthing/core";
 const uploadedFileSchema = z.object({
     key: z.string(),
     name: z.string(),
-    url: z.string().url(),
+    url: z.string().url().optional(),
+    ufsUrl: z.string().url().optional(),
     size: z.number(),
 });
 
@@ -181,7 +182,7 @@ export function NewRequestForm() {
                                     ufsUrl: file.url,
                                     size: file.size
                                 }));
-                                console.log("Processed newFiles:", newFiles);
+                                console.log("Processed newFiles (Aligned Schema):", newFiles);
                                 setUploadedFiles((prev) => [...prev, ...newFiles]);
                                 toast.success(`${res.length} file(s) uploaded successfully!`);
                             }
