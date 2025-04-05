@@ -10,7 +10,10 @@ import { prisma } from '@/lib/prisma';
 const uploadedFileSchema = z.object({
     key: z.string(), // Need key for potential future management if needed
     name: z.string(),
-    url: z.string().url(),
+    // Update to expect ufsUrl, but make it optional initially for safety
+    // and accept the old url as well during transition
+    url: z.string().url().optional(), // Keep url for backward compatibility if needed
+    ufsUrl: z.string().url().optional(), // Add the new field
     size: z.number(),
 });
 
@@ -50,8 +53,9 @@ export async function submitNewRequest(values: z.infer<typeof submitRequestSchem
                 files: uploadedFiles && uploadedFiles.length > 0 ? {
                     create: uploadedFiles.map(file => ({
                         name: file.name,
-                        url: file.url,
-                        // key: file.key, // Add key if you want to store it
+                        // Use ufsUrl if available, otherwise fallback to url
+                        url: file.ufsUrl || file.url || '', // Save to the DB 'url' field
+                        key: file.key, // Store the key
                         // size: file.size, // Add size if you want to store it
                         userId: userId, // Associate file with the user
                         // Prisma automatically links this file to the DesignRequest being created

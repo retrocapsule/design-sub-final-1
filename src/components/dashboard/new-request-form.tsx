@@ -173,13 +173,15 @@ export function NewRequestForm() {
                         endpoint="designRequestUploader"
                         onClientUploadComplete={(res) => {
                             if (res) {
-                                console.log("Upload completed:", res);
+                                console.log("Upload completed (Raw Response):", res);
                                 const newFiles: UploadedFileState[] = res.map(file => ({
                                     key: file.key,
                                     name: file.name,
                                     url: file.url,
+                                    ufsUrl: file.url,
                                     size: file.size
                                 }));
+                                console.log("Processed newFiles:", newFiles);
                                 setUploadedFiles((prev) => [...prev, ...newFiles]);
                                 toast.success(`${res.length} file(s) uploaded successfully!`);
                             }
