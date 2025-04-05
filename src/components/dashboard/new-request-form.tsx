@@ -67,9 +67,18 @@ export function NewRequestForm() {
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     startTransition(async () => {
+        console.log("[NewRequestForm] Starting form submission with values:", {
+          title: values.title,
+          description: values.description.substring(0, 20) + "...", // Log just the start of description
+          referenceLinks: values.referenceLinks,
+          uploadedFiles: uploadedFiles.length
+        });
+        
         const dataToSubmit = { ...values, uploadedFiles };
+        console.log("[NewRequestForm] uploadedFiles being sent:", JSON.stringify(uploadedFiles, null, 2));
         
         const result = await submitNewRequest(dataToSubmit);
+        console.log("[NewRequestForm] Submission result:", result);
 
         if (result.success) {
             toast.success(result.message || "Design request submitted successfully!");
@@ -77,7 +86,13 @@ export function NewRequestForm() {
             setUploadedFiles([]);
             router.push('/dashboard/requests');
         } else {
+            console.error("[NewRequestForm] Error submitting request:", result);
+            // Display the error message from the server
             toast.error(result.message || "Failed to submit design request");
+            // If there's a detailed error, show it in the console
+            if (result.error) {
+                console.error("[NewRequestForm] Detailed error:", result.error);
+            }
         }
     });
   }

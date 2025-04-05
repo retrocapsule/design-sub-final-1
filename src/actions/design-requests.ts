@@ -26,49 +26,94 @@ const submitRequestSchema = z.object({
 });
 
 export async function submitNewRequest(values: z.infer<typeof submitRequestSchema>) {
+    console.log("[submitNewRequest] Starting with values:", JSON.stringify(values, null, 2));
+    
     const validation = submitRequestSchema.safeParse(values);
     if (!validation.success) {
-        console.error("Server Action Validation Error:", validation.error.errors);
+        console.error("[submitNewRequest] Validation Error:", JSON.stringify(validation.error.errors, null, 2));
+        console.error("[submitNewRequest] Input that failed validation:", JSON.stringify(values, null, 2));
         return { success: false, message: "Invalid input data." };
     }
+    console.log("[submitNewRequest] Validation successful");
 
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
+        console.error("[submitNewRequest] No user session found");
         return { success: false, message: "Authentication required." };
     }
+    console.log("[submitNewRequest] User authenticated:", session.user.id);
 
     const { title, description, referenceLinks, uploadedFiles } = validation.data;
     const userId = session.user.id;
 
+    // Log the extracted data
+    console.log("[submitNewRequest] Extracted data:", {
+        title,
+        description,
+        referenceLinks: referenceLinks || null,
+        userId,
+        uploadedFiles: uploadedFiles ? uploadedFiles.length : 0
+    });
+
     try {
-        await prisma.designRequest.create({
+        // If there are uploaded files, prepare the file data
+        let filesData = undefined;
+        if (uploadedFiles && uploadedFiles.length > 0) {
+            // Map the files to the format expected by Prisma
+            const mappedFiles = uploadedFiles.map(file => {
+                // Ensure file.url or file.ufsUrl is available
+                const fileUrl = file.ufsUrl || file.url || '';
+                if (!fileUrl) {
+                    console.warn("[submitNewRequest] File missing URL:", file);
+                }
+                
+                return {
+                    name: file.name,
+                    url: fileUrl,
+                    key: file.key,
+                    userId: userId
+                };
+            });
+            
+            console.log("[submitNewRequest] Preparing to create files:", JSON.stringify(mappedFiles, null, 2));
+            filesData = { create: mappedFiles };
+        }
+
+        // Create the design request with the prepared file data
+        const result = await prisma.designRequest.create({
             data: {
                 title,
                 description,
-                // TODO: Potentially parse referenceLinks string into structured data if needed
-                // For now, assuming it's just stored as submitted text
-                referenceLinks: referenceLinks || null, 
+                referenceLinks: referenceLinks || null,
                 userId,
-                // Correct way to create related files within a nested create
-                files: uploadedFiles && uploadedFiles.length > 0 ? {
-                    create: uploadedFiles.map(file => ({
-                        name: file.name,
-                        // Use ufsUrl if available, otherwise fallback to url
-                        url: file.ufsUrl || file.url || '', // Save to the DB 'url' field
-                        key: file.key, // Store the key
-                        // size: file.size, // Add size if you want to store it
-                        userId: userId, // Associate file with the user
-                        // Prisma automatically links this file to the DesignRequest being created
-                    }))
-                } : undefined,
+                status: "PENDING", // Ensure status is set
+                priority: "MEDIUM", // Set a default priority
+                projectType: "GENERAL", // Set a default project type
+                fileFormat: "ANY", // Set a default file format
+                dimensions: "STANDARD", // Set a default dimension
+                files: filesData
             },
+            include: {
+                files: true // Include files in the result for verification
+            }
         });
+
+        console.log("[submitNewRequest] Success! Created design request:", result.id);
+        console.log("[submitNewRequest] Files created:", result.files.length);
 
         revalidatePath('/dashboard/requests'); // Revalidate the requests list page
         return { success: true, message: "Request submitted successfully!" };
 
     } catch (error) {
-        console.error("Failed to create design request:", error);
+        console.error("[submitNewRequest] Database error:", error);
+        // Provide more detailed error information
+        if (error instanceof Error) {
+            return { 
+                success: false, 
+                message: `Database error: ${error.message}`,
+                error: error.stack 
+            };
+        }
         return { success: false, message: "Database error: Failed to submit request." };
     }
 } 
