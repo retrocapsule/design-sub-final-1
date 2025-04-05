@@ -46,18 +46,16 @@ export async function submitNewRequest(values: z.infer<typeof submitRequestSchem
                 // For now, assuming it's just stored as submitted text
                 referenceLinks: referenceLinks || null, 
                 userId,
-                // Create related files if any were uploaded
+                // Correct way to create related files within a nested create
                 files: uploadedFiles && uploadedFiles.length > 0 ? {
-                    createMany: {
-                        data: uploadedFiles.map(file => ({
-                            name: file.name,
-                            url: file.url,
-                            // Assuming size is useful to store, add key if needed too
-                            // size: file.size,
-                            // key: file.key,
-                            userId: userId, // Associate file with the user who uploaded it
-                        })),
-                    }
+                    create: uploadedFiles.map(file => ({
+                        name: file.name,
+                        url: file.url,
+                        // key: file.key, // Add key if you want to store it
+                        // size: file.size, // Add size if you want to store it
+                        userId: userId, // Associate file with the user
+                        // Prisma automatically links this file to the DesignRequest being created
+                    }))
                 } : undefined,
             },
         });
