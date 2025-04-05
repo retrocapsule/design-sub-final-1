@@ -12,14 +12,17 @@ const tokenLoaded = !!process.env.UPLOADTHING_TOKEN;
 console.log(`[UploadThing Route] UPLOADTHING_SECRET loaded: ${secretLoaded}`);
 console.log(`[UploadThing Route] UPLOADTHING_APP_ID loaded: ${appIdLoaded}`);
 console.log(`[UploadThing Route] UPLOADTHING_TOKEN loaded: ${tokenLoaded}`);
+console.log(`[UploadThing Route] Callback URL: ${process.env.NEXT_PUBLIC_CALLBACK_URL || "not set"}`);
 console.log("------------------------------------");
 
-// Export routes for Next App Router
+// Export routes for Next App Router with optimized configuration
 export const { GET, POST } = createRouteHandler({
   router: ourFileRouter,
   config: {
     uploadthingId: process.env.NEXT_PUBLIC_UPLOADTHING_APP_ID,
-    uploadthingSecret: process.env.UPLOADTHING_SECRET
+    uploadthingSecret: process.env.UPLOADTHING_SECRET,
+    isDev: process.env.NODE_ENV === "development",
+    callbackUrl: `${process.env.NEXT_PUBLIC_CALLBACK_URL || "https://design-sub-final-1.vercel.app"}/api/uploadthing`
   }
 });
 

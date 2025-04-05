@@ -185,14 +185,16 @@ export function NewRequestForm() {
                             }
                         }}
                         onUploadError={(error: Error) => {
-                            console.error("Upload failed:", error.message);
-                            toast.error(`Upload Failed: ${error.message}`);
+                            console.error("Upload failed:", error.message, error);
+                            toast.error(`Upload Failed: ${error.message || "Check the console for details"}`);
                         }}
                         onUploadBegin={() => {
                             console.log("Upload starting...");
                         }}
                         config={{
-                            mode: "auto"
+                            mode: "manual",
+                            appendOnPreflight: true,
+                            uploadUrl: "https://us.ingest.uploadthing.com"
                         }}
                         appearance={{
                             button: "bg-primary text-white hover:bg-primary/90 px-6 py-2 rounded-md font-medium",

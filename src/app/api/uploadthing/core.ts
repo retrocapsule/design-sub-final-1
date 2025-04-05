@@ -16,22 +16,34 @@ console.log(`[Uploadthing Core] UPLOADTHING_APP_ID loaded: ${appIdLoaded}`);
 console.log(`[Uploadthing Core] UPLOADTHING_TOKEN loaded: ${tokenLoaded}`);
 console.log("------------------------------------");
 
-// Create the uploadthing instance with simplified configuration
-const f = createUploadthing();
+// Create the uploadthing instance with error logging
+const f = createUploadthing({
+  errorFormatter: (err) => {
+    console.error("[UploadThing Error]", err);
+    return { message: `Upload Error: ${err.message || "Unknown error"}` };
+  },
+});
 
 // Function to get the user session
 const getUserSession = async () => {
-  return await getServerSession(authOptions);
+  try {
+    const session = await getServerSession(authOptions);
+    console.log("[Uploadthing] Got session:", !!session);
+    return session;
+  } catch (error) {
+    console.error("[Uploadthing] Session error:", error);
+    return null;
+  }
 }
 
-// FileRouter for your app with simplified configuration
+// FileRouter for your app with improved configuration
 export const ourFileRouter = {
   // Define a simpler uploader with minimal configuration
   designRequestUploader: f({
       image: { maxFileSize: "4MB", maxFileCount: 5 }, 
       pdf: { maxFileSize: "16MB", maxFileCount: 5 },
      })
-    .middleware(async () => {
+    .middleware(async ({ req }) => {
       console.log("[Uploadthing Middleware] Checking session...");
       const session = await getUserSession(); 
  
@@ -44,8 +56,9 @@ export const ourFileRouter = {
       return { userId: session.user.id };
     })
     .onUploadComplete(({ metadata, file }) => {
-      console.log("[Uploadthing onUploadComplete] Upload complete for userId:", metadata.userId);
-      console.log("[Uploadthing onUploadComplete] file url", file.url);
+      console.log("[Uploadthing onUploadComplete] Upload complete");
+      console.log("[Uploadthing onUploadComplete] metadata:", metadata);
+      console.log("[Uploadthing onUploadComplete] file:", file);
  
       // Return simplified data
       return {
