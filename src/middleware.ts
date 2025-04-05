@@ -4,8 +4,8 @@ import { NextRequest } from "next/server";
 // Remove direct Prisma import
 // import { prisma } from "@/lib/prisma"; 
 
-// Force the middleware to run in the Node.js runtime (Keep this, might still be needed for getToken or other logic)
-export const runtime = 'nodejs';
+// Remove the runtime declaration
+// export const runtime = 'nodejs';
 
 export async function middleware(request: NextRequest) {
   // --- DETAILED LOGGING START ---
