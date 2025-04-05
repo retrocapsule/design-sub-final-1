@@ -16,9 +16,6 @@ const nextConfig = {
     }
     return config;
   },
-  experimental: {
-    nodeMiddleware: true, // Enable Node.js middleware runtime support
-  },
 };
 
 module.exports = nextConfig; 
