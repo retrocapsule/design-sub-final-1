@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
+import { UploadButton } from "@uploadthing/react";
+import { X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -20,6 +22,15 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { submitNewRequest } from '@/actions/design-requests';
+import type { OurFileRouter } from "@/app/api/uploadthing/core";
+
+const uploadedFileSchema = z.object({
+    key: z.string(),
+    name: z.string(),
+    url: z.string().url(),
+    size: z.number(),
+});
 
 const formSchema = z.object({
   title: z.string().min(3, {
@@ -29,11 +40,15 @@ const formSchema = z.object({
     message: "Description must be at least 10 characters.",
   }),
   referenceLinks: z.string().optional(),
+  uploadedFiles: z.array(uploadedFileSchema).optional(),
 });
+
+type UploadedFileState = z.infer<typeof uploadedFileSchema>;
 
 export function NewRequestForm() {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFileState[]>([]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -41,31 +56,29 @@ export function NewRequestForm() {
       title: "",
       description: "",
       referenceLinks: "",
+      uploadedFiles: [],
     },
   });
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
-    setIsLoading(true);
-    
-    try {
-      // In a real application, this would send data to your backend
-      // await fetch('/api/design-requests', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(values),
-      // });
-      
-      // For demo purposes, we'll just simulate a delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      toast.success("Design request submitted successfully!");
-      router.push('/dashboard/requests');
-    } catch (error) {
-      console.error(error);
-      toast.error("Failed to submit design request");
-    } finally {
-      setIsLoading(false);
-    }
+  const handleRemoveFile = (key: string) => {
+      setUploadedFiles((prev) => prev.filter(file => file.key !== key));
+  };
+
+  function onSubmit(values: z.infer<typeof formSchema>) {
+    startTransition(async () => {
+        const dataToSubmit = { ...values, uploadedFiles };
+        
+        const result = await submitNewRequest(dataToSubmit);
+
+        if (result.success) {
+            toast.success(result.message || "Design request submitted successfully!");
+            form.reset();
+            setUploadedFiles([]);
+            router.push('/dashboard/requests');
+        } else {
+            toast.error(result.message || "Failed to submit design request");
+        }
+    });
   }
 
   return (
@@ -116,34 +129,93 @@ export function NewRequestForm() {
               name="referenceLinks"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Reference Links</FormLabel>
+                  <FormLabel>Reference Links (Optional)</FormLabel>
                   <FormControl>
                     <Textarea 
-                      placeholder="https://example.com/inspiration1&#10;https://example.com/inspiration2" 
+                      placeholder="https://example.com/inspiration1\nhttps://example.com/inspiration2" 
                       {...field} 
                     />
                   </FormControl>
                   <FormDescription>
-                    Optional: Add links to designs you like (one per line).
+                    Add links to designs you like (one per line).
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
             
-            {/* File upload would be implemented here, but we're keeping it simple */}
-            
+            <FormItem>
+                <FormLabel>Reference Files</FormLabel>
+                <FormControl>
+                    {uploadedFiles.length > 0 && (
+                        <div className="mb-4 space-y-2">
+                            <p className="text-sm font-medium">Uploaded Files:</p>
+                            <ul className="list-disc list-inside bg-muted p-3 rounded-md">
+                                {uploadedFiles.map((file) => (
+                                    <li key={file.key} className="text-sm flex justify-between items-center">
+                                        <span>{file.name} ({(file.size / 1024).toFixed(1)} KB)</span>
+                                        <Button 
+                                            type="button" 
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => handleRemoveFile(file.key)}
+                                            aria-label={`Remove ${file.name}`}
+                                            className="ml-2 h-6 w-6 p-0"
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </Button>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                    <UploadButton<OurFileRouter>
+                        endpoint="designRequestUploader"
+                        onClientUploadComplete={(res) => {
+                            if (res) {
+                                const newFiles: UploadedFileState[] = res.map(file => ({
+                                    key: file.key,
+                                    name: file.name,
+                                    url: file.url,
+                                    size: file.size
+                                }));
+                                setUploadedFiles((prev) => [...prev, ...newFiles]);
+                                toast.success(`${res.length} file(s) uploaded successfully!`);
+                            }
+                        }}
+                        onUploadError={(error: Error) => {
+                            toast.error(`Upload Failed: ${error.message}`);
+                        }}
+                        content={{
+                            button({ ready, isUploading }) {
+                              if (ready) return <div>Upload Files</div>;
+                              if (isUploading) return <div>Uploading...</div>
+                              return "Getting ready...";
+                            },
+                            allowedContent({ ready, fileTypes, isUploading }) {
+                              return `Images/PDFs up to 4MB/16MB (${uploadedFiles.length} uploaded)`;
+                            },
+                          }}
+                          className="ut-button:bg-primary ut-button:text-primary-foreground ut-button:ut-readying:bg-primary/80"
+                    />
+                </FormControl>
+                <FormDescription>
+                    Upload reference images or PDFs (Max 5 files).
+                </FormDescription>
+                <FormMessage />
+            </FormItem>
+
             <div className="flex justify-end space-x-4">
               <Button 
                 type="button" 
                 variant="outline" 
                 onClick={() => router.back()}
-                disabled={isLoading}
+                disabled={isPending}
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isLoading}>
-                {isLoading ? "Submitting..." : "Submit Request"}
+              <Button type="submit" disabled={isPending}>
+                {isPending ? "Submitting..." : "Submit Request"}
               </Button>
             </div>
           </form>

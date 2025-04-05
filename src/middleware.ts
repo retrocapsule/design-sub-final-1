@@ -8,21 +8,41 @@ import { NextRequest } from "next/server";
 export const runtime = 'nodejs';
 
 export async function middleware(request: NextRequest) {
-  const token = await getToken({ req: request });
-  const isAuthenticated = !!token;
-  const userStatus = token?.subscriptionStatus as string | undefined; // Get status from token
+  // --- DETAILED LOGGING START ---
+  console.log(`\\n--- Middleware Start ---`);
+  const path = request.nextUrl.pathname;
+  console.log(`Requested Path: ${path}`);
 
-  // *** ADD LOGGING HERE ***
-  if (isAuthenticated) {
-    console.log(`Middleware Check: User ${token?.email}, Token Status: '${userStatus}'`);
+  let token;
+  let tokenError = null;
+  try {
+    token = await getToken({ req: request });
+    console.log(`Token fetched: ${token ? JSON.stringify(token, null, 2) : 'null'}`);
+  } catch (error) {
+    tokenError = error;
+    console.error(`Error fetching token:`, error);
   }
+
+  const isAuthenticated = !!token;
+  console.log(`Is Authenticated: ${isAuthenticated}`);
+
+  const isPublicPath = path.startsWith('/signin') || path.startsWith('/signup');
+  console.log(`Is Public Path (signin/signup): ${isPublicPath}`);
+  // --- DETAILED LOGGING END ---
+
+  // const userStatus = token?.subscriptionStatus as string | undefined; // Get status from token - Moved this down
+
+  // *** Original Logging - Kept for reference ***
+  // if (isAuthenticated) {
+  //   console.log(`Middleware Check: User ${token?.email}, Token Status: '${userStatus}'`); // Moved this down
+  // }
   // *************************
 
-  const isSubscriptionRequiredPath = request.nextUrl.pathname.startsWith('/dashboard/requests');
+  const isSubscriptionRequiredPath = path.startsWith('/dashboard/requests');
   // const isNewRequestPage = request.nextUrl.pathname === '/dashboard/requests/new'; // Covered by startsWith
 
   // Get the pathname of the request
-  const path = request.nextUrl.pathname;
+  // const path = request.nextUrl.pathname;
   
   // Clone the URL for potential redirects
   const url = request.nextUrl.clone();
@@ -35,7 +55,7 @@ export async function middleware(request: NextRequest) {
   const isProtectedPath = path.startsWith('/dashboard');
   
   // Public paths accessible to all users
-  const isPublicPath = path.startsWith('/signin') || path.startsWith('/signup');
+  // const isPublicPath = path.startsWith('/signin') || path.startsWith('/signup');
   
   // --- Redirect /subscribe (but NOT /subscribe/test) to /checkout --- 
   if (path.startsWith('/subscribe') && path !== '/subscribe/test') {
@@ -43,7 +63,8 @@ export async function middleware(request: NextRequest) {
     if (plan) {
       url.searchParams.set('plan', plan);
     }
-    console.log(`Middleware: Redirecting from ${path} to ${url.pathname}${url.search}`);
+    console.log(`Middleware: Redirecting from ${path} to ${url.pathname}${url.search} (Subscription page redirect)`);
+    console.log(`--- Middleware End (Redirect) ---`);
     return NextResponse.redirect(url);
   }
   // --- End Redirect Logic --- 
@@ -52,6 +73,7 @@ export async function middleware(request: NextRequest) {
   if (isAuthenticated && isPublicPath) {
     url.pathname = '/dashboard';
     console.log(`Middleware: Redirecting authenticated user from ${path} to /dashboard`);
+    console.log(`--- Middleware End (Redirect) ---`);
     return NextResponse.redirect(url);
   }
   
@@ -60,6 +82,7 @@ export async function middleware(request: NextRequest) {
     url.pathname = '/signin'; // Redirect to signin if trying to access dashboard while unauthenticated
     url.searchParams.set('callbackUrl', request.nextUrl.href); // Add callback URL
     console.log(`Middleware: Redirecting unauthenticated user from ${path} to ${url.pathname}`);
+    console.log(`--- Middleware End (Redirect) ---`);
     return NextResponse.redirect(url);
   }
 
@@ -68,12 +91,13 @@ export async function middleware(request: NextRequest) {
       url.pathname = '/signin';
       url.searchParams.set('callbackUrl', request.nextUrl.href);
       console.log(`Middleware: Redirecting unauthenticated user from ${path} to ${url.pathname}`);
+      console.log(`--- Middleware End (Redirect) ---`);
       return NextResponse.redirect(url);
   }
   
   // --- NEW Subscription Check Logic --- 
   if (isAuthenticated && isSubscriptionRequiredPath) {
-    // Add log specific to this check
+    const userStatus = token?.subscriptionStatus as string | undefined; // Get status from token now
     console.log(`Middleware: Checking subscription for ${path}. User Status from Token: '${userStatus}'`);
     const hasActiveSubscription = userStatus === 'active';
 
@@ -81,16 +105,19 @@ export async function middleware(request: NextRequest) {
       console.log(`Middleware: User ${token?.email} has status '${userStatus}', redirecting from ${path} to billing.`);
       // Redirect to billing if subscription is not active
       url.pathname = '/dashboard/billing';
+      console.log(`--- Middleware End (Redirect) ---`);
       return NextResponse.redirect(url);
     } else {
        console.log(`Middleware: User ${token?.email} has active status, allowing access to ${path}.`);
        // Allow access if subscription is active
+       console.log(`--- Middleware End (Next) ---`);
        return NextResponse.next(); 
     }
   }
   
   // For all other authenticated & non-subscription-required paths, or paths handled above
   console.log(`Middleware: Allowing request to ${path} (default rule).`);
+  console.log(`--- Middleware End (Next) ---`);
   return NextResponse.next();
 }
 
