@@ -7,18 +7,16 @@ import { authOptions } from "@/lib/auth"; // Adjust path if your auth options ar
 // import { authOptions } from "@/lib/auth"; 
 
 console.log("------------------------------------");
-console.log("[Uploadthing Core - Restored] Initializing...");
+console.log("[Uploadthing Core] Initializing...");
 const secretLoaded = !!process.env.UPLOADTHING_SECRET;
 const appIdLoaded = !!process.env.UPLOADTHING_APP_ID;
-console.log(`[Uploadthing Core - Restored] UPLOADTHING_SECRET loaded: ${secretLoaded}`);
-console.log(`[Uploadthing Core - Restored] UPLOADTHING_APP_ID loaded: ${appIdLoaded}`);
-if (!secretLoaded || !appIdLoaded) {
-  console.error("[Uploadthing Core - Restored] FATAL ERROR: Required env vars missing!");
-  // NOTE: In a real app, you might want to throw here to prevent startup
-}
+const tokenLoaded = !!process.env.UPLOADTHING_TOKEN;
+console.log(`[Uploadthing Core] UPLOADTHING_SECRET loaded: ${secretLoaded}`);
+console.log(`[Uploadthing Core] UPLOADTHING_APP_ID loaded: ${appIdLoaded}`);
+console.log(`[Uploadthing Core] UPLOADTHING_TOKEN loaded: ${tokenLoaded}`);
 console.log("------------------------------------");
 
-// Revert to basic createUploadthing call without errorFormatter
+// Create the uploadthing instance with simplified configuration
 const f = createUploadthing();
 
 // Function to get the user session
@@ -26,36 +24,37 @@ const getUserSession = async () => {
   return await getServerSession(authOptions);
 }
 
-// FileRouter for your app, can contain multiple FileRoutes
+// FileRouter for your app with simplified configuration
 export const ourFileRouter = {
-  // Restored original uploader with session check
+  // Define a simpler uploader with minimal configuration
   designRequestUploader: f({
       image: { maxFileSize: "4MB", maxFileCount: 5 }, 
       pdf: { maxFileSize: "16MB", maxFileCount: 5 },
      })
-    .middleware(async ({ req }) => {
-      console.log("[Uploadthing Middleware - Restored] Checking session...");
+    .middleware(async () => {
+      console.log("[Uploadthing Middleware] Checking session...");
       const session = await getUserSession(); 
  
       if (!session?.user?.id) {
-          console.error("[Uploadthing Middleware - Restored] Unauthorized: No session user ID found.");
+          console.error("[Uploadthing Middleware] Unauthorized: No session user ID found.");
           throw new Error("Unauthorized");
       }
  
-      console.log(`[Uploadthing Middleware - Restored] Authorized for user: ${session.user.id}`);
+      console.log(`[Uploadthing Middleware] Authorized for user: ${session.user.id}`);
       return { userId: session.user.id };
     })
-    .onUploadComplete(async ({ metadata, file }) => {
-      console.log("[Uploadthing onUploadComplete - Restored] Upload complete for userId:", metadata.userId);
-      console.log("[Uploadthing onUploadComplete - Restored] file url", file.url);
+    .onUploadComplete(({ metadata, file }) => {
+      console.log("[Uploadthing onUploadComplete] Upload complete for userId:", metadata.userId);
+      console.log("[Uploadthing onUploadComplete] file url", file.url);
  
-      // Return detailed data needed by the frontend/backend
-      return { 
+      // Return simplified data
+      return {
           uploadedBy: metadata.userId, 
           fileName: file.name, 
           fileSize: file.size,
-          fileUrl: file.url 
-        };
+          fileUrl: file.url,
+          key: file.key
+      };
     }),
 } satisfies FileRouter;
 

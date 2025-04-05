@@ -173,6 +173,7 @@ export function NewRequestForm() {
                         endpoint="designRequestUploader"
                         onClientUploadComplete={(res) => {
                             if (res) {
+                                console.log("Upload completed:", res);
                                 const newFiles: UploadedFileState[] = res.map(file => ({
                                     key: file.key,
                                     name: file.name,
@@ -184,22 +185,19 @@ export function NewRequestForm() {
                             }
                         }}
                         onUploadError={(error: Error) => {
+                            console.error("Upload failed:", error.message);
                             toast.error(`Upload Failed: ${error.message}`);
+                        }}
+                        onUploadBegin={() => {
+                            console.log("Upload starting...");
+                        }}
+                        config={{
+                            mode: "auto"
                         }}
                         appearance={{
                             button: "bg-primary text-white hover:bg-primary/90 px-6 py-2 rounded-md font-medium",
                             container: "w-full border-2 border-dashed border-slate-300 rounded-md p-4 bg-slate-50",
                             allowedContent: "text-slate-700 font-medium text-sm mt-2"
-                        }}
-                        content={{
-                            button({ ready, isUploading }) {
-                              if (ready) return <div>Upload Files</div>;
-                              if (isUploading) return <div>Uploading...</div>
-                              return <div>Getting ready...</div>;
-                            },
-                            allowedContent({ ready, fileTypes, isUploading }) {
-                              return <div>Images/PDFs up to 4MB/16MB ({uploadedFiles.length} uploaded)</div>;
-                            },
                         }}
                     />
                 </FormControl>
