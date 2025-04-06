@@ -70,7 +70,7 @@ export default function Home() {
       <section className="relative py-12 sm:py-16 md:min-h-screen flex items-center justify-center overflow-hidden">
         {/* Background Effects */}
         <div className="absolute inset-0 bg-gradient-to-b from-white/60 to-white/90 z-10" />
-        <div className="absolute inset-0 bg-[url('/Images/hero_bg.png')] bg-cover bg-center blur-sm z-0" />
+        <div className="absolute inset-0 bg-[url('/Images/hero_bg.png')] bg-cover bg-center opacity-10" />
         
         {/* Animated Shapes */}
         <div className="absolute inset-0 overflow-hidden">
@@ -700,9 +700,9 @@ export default function Home() {
 
       {/* 9. Scarcity Section */}
       <section className="py-24 px-4 sm:px-6 lg:px-8 bg-primary text-primary-foreground relative overflow-hidden">
-        <div className="absolute inset-0 bg-[url('/scarcity-bg.jpg')] bg-cover bg-center opacity-10" />
+        <div className="absolute inset-0 bg-[url('/Images/hero_bg.png')] bg-cover bg-center opacity-10" />
         <div className="absolute inset-0 bg-gradient-to-br from-primary/90 to-purple-600/90" />
-        <div className="absolute inset-0 bg-[url('/images/textures/tile-pattern.png')] bg-repeat" />
+        <div className="absolute inset-0 bg-[url('/Images/textures/tile-pattern.png')] bg-repeat" />
         
         <div className="container relative mx-auto text-center">
           <div className="inline-flex items-center px-4 py-2 rounded-full bg-white/10 text-white mb-6">
@@ -892,7 +892,7 @@ export default function Home() {
 
       {/* 11. Guarantees Section / Final CTA */}
       <section className="py-24 px-4 sm:px-6 lg:px-8 bg-primary text-primary-foreground relative overflow-hidden">
-        <div className="absolute inset-0 bg-[url('/cta-bg.jpg')] bg-cover bg-center opacity-10" />
+        <div className="absolute inset-0 bg-[url('/Images/hero_bg.png')] bg-cover bg-center opacity-10" />
         <div className="absolute inset-0 bg-gradient-to-br from-primary/90 to-purple-600/90" />
         
         <div className="container relative mx-auto text-center">
