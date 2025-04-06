@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "npx prisma migrate deploy && prisma generate && next build",
+    "build": "npx prisma db execute --file=prisma/migrations/manual_fix_role_enum/migration.sql && npx prisma migrate deploy && prisma generate && next build",
     "start": "next start",
     "lint": "next lint"
   },

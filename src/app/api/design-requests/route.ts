@@ -3,40 +3,53 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-/**
- * Explicitly cast the role to text in the query to avoid enum type casting issues
- */
 export async function POST(request: Request) {
   try {
-    // Get user session for authentication
     const session = await getServerSession(authOptions);
+    console.log("Session data:", session); // Debug log for session
+
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const user = session.user;
-    console.log("Session data:", {
-      user: {
-        name: user.name,
-        email: user.email,
-        image: user.image,
-        id: user.id,
-        role: user.role,
-        subscriptionStatus: user.subscriptionStatus,
-        onboardingCompleted: user.onboardingCompleted
-      }
+
+    // Verify user exists in database or create them
+    let user = await prisma.user.findUnique({
+      where: { id: session.user.id }
     });
 
-    // Parse request body
+    if (!user) {
+      console.log("User not found, creating new user:", session.user);
+      try {
+        user = await prisma.user.create({
+          data: {
+            id: session.user.id,
+            name: session.user.name || "",
+            email: session.user.email || "",
+            role: "USER",
+          },
+        });
+        console.log("Created new user:", user);
+      } catch (createError) {
+        console.error("Error creating user:", createError);
+        return NextResponse.json({ 
+          error: "Failed to create user",
+          details: createError instanceof Error ? createError.message : "Unknown error"
+        }, { status: 500 });
+      }
+    }
+
     const body = await request.json();
-    console.log("Received request body:", body);
-    
+    console.log("Received request body:", body); // Debug log
+
     const { title, description, priority, projectType, fileFormat, dimensions } = body;
+
+    // Log each field to check for undefined or null values
     console.log("Field values:", {
-      title, 
-      description, 
-      priority, 
-      projectType, 
-      fileFormat, 
+      title,
+      description,
+      priority,
+      projectType,
+      fileFormat,
       dimensions,
       userId: user.id
     });
@@ -56,21 +69,17 @@ export async function POST(request: Request) {
     }
 
     try {
-      // Find the first available admin - use explicit text casting for role
-      console.log("Finding admin with role cast to text to avoid enum issues");
-      const admin = await prisma.$queryRaw`
-        SELECT id, name, email
-        FROM "User"
-        WHERE "role"::text = 'ADMIN'
-        LIMIT 1
-      `;
-      
-      let adminId = null;
-      if (Array.isArray(admin) && admin.length > 0) {
-        adminId = admin[0].id;
-        console.log(`Found admin: ${adminId}`);
-      } else {
+      // Find the first available admin
+      const admin = await prisma.user.findFirst({
+        where: { role: "ADMIN" }
+      });
+
+      if (!admin) {
         console.error("No admin found in the system");
+        return NextResponse.json({ 
+          error: "No staff available",
+          details: "There are no staff members available to handle your request"
+        }, { status: 503 });
       }
 
       // Create the design request with exactly the fields from the schema
@@ -84,7 +93,7 @@ export async function POST(request: Request) {
           fileFormat: String(fileFormat),
           dimensions: String(dimensions),
           userId: user.id,
-          assignedToId: adminId, // Assign to admin if found, otherwise null
+          assignedToId: admin.id, // Assign to the first available admin
         },
         include: {
           user: {
@@ -102,24 +111,29 @@ export async function POST(request: Request) {
         },
       });
 
-      console.log("Created design request:", designRequest.id); // Debug log
+      console.log("Created design request:", designRequest); // Debug log
       return NextResponse.json(designRequest);
     } catch (prismaError) {
       console.error("[DESIGN_REQUEST_POST_PRISMA_ERROR]", prismaError);
-      // Return detailed error for debugging
-      return NextResponse.json({ 
-        error: "Database error", 
-        message: prismaError instanceof Error ? prismaError.message : "Unknown database error",
-        stack: prismaError instanceof Error ? prismaError.stack : undefined
-      }, { status: 500 });
+      return NextResponse.json(
+        { 
+          error: "Database error",
+          details: prismaError instanceof Error ? prismaError.message : "Unknown database error",
+          stack: prismaError instanceof Error ? prismaError.stack : undefined
+        },
+        { status: 500 }
+      );
     }
   } catch (error) {
-    console.error("[DESIGN_REQUEST_POST_ERROR]", error);
-    return NextResponse.json({ 
-      error: "Failed to create design request",
-      message: error instanceof Error ? error.message : "Unknown error",
-      stack: error instanceof Error ? error.stack : undefined
-    }, { status: 500 });
+    console.error("[DESIGN_REQUEST_POST]", error);
+    return NextResponse.json(
+      { 
+        error: "Failed to create design request",
+        details: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined
+      },
+      { status: 500 }
+    );
   }
 }
 
